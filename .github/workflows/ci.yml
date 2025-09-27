@@ -1,0 +1,313 @@
+name: Test and Build
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  SOLANA_CLI_VERSION: 1.18.17
+  ANCHOR_CLI_VERSION: 0.30.1
+  REGISTRY_URL: https://npm.registry.npmjs.org/
+
+jobs:
+  # Job 1: Frontend Testing and Building
+  frontend:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        registry-url: ${{ env.REGISTRY_URL }}
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: latest
+
+    - name: Get pnpm store directory
+      shell: bash
+      run: |
+        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+    - name: Cache pnpm dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.pnpm-store
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Lint code
+      run: pnpm run lint
+
+    - name: Check formatting
+      run: pnpm run format:check
+
+    - name: Type check
+      run: pnpm run build --mode development
+
+    - name: Build production
+      run: pnpm run build
+      env:
+        VITE_SOLANA_CLUSTER: localnet
+        VITE_ENVIRONMENT: production
+
+    - name: Upload frontend artifacts
+      uses: actions/upload-artifact@v4
+      if: matrix.node-version == 20
+      with:
+        name: frontend-dist
+        path: dist/
+        retention-days: 7
+
+  # Job 2: Anchor Programs Testing and Building
+  anchor:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: latest
+
+    - name: Cache Rust toolchain
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.rustup/toolchains
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-rustup-
+
+    - name: Cache Cargo dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          anchor/target/
+        key: ${{ runner.os }}-cargo-anchor-${{ hashFiles('anchor/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-anchor-
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: Install Solana CLI
+      run: |
+        sh -c "$(curl -sSfL https://release.solana.com/v${{ env.SOLANA_CLI_VERSION }}/install)"
+        echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+    - name: Cache Solana CLI
+      uses: actions/cache@v4
+      with:
+        path: ~/.local/share/solana
+        key: ${{ runner.os }}-solana-${{ env.SOLANA_CLI_VERSION }}
+
+    - name: Install Anchor CLI
+      run: |
+        npm install -g @coral-xyz/anchor-cli@${{ env.ANCHOR_CLI_VERSION }}
+
+    - name: Setup Solana keypair
+      run: |
+        mkdir -p ~/.config/solana
+        echo "[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]" > ~/.config/solana/id.json
+        solana config set --keypair ~/.config/solana/id.json
+        solana config set --url localhost
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Check Rust formatting
+      run: |
+        cd anchor
+        cargo fmt --all -- --check
+
+    - name: Rust clippy
+      run: |
+        cd anchor
+        cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Sync program keys
+      run: |
+        cd anchor
+        anchor keys sync
+
+    - name: Build Anchor programs
+      run: |
+        cd anchor
+        anchor build
+
+    - name: Generate TypeScript clients
+      run: pnpm run codama:js
+
+    - name: Test Anchor programs
+      run: |
+        cd anchor
+        anchor test --skip-local-validator
+
+    - name: Upload Anchor artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: anchor-artifacts
+        path: |
+          anchor/target/deploy/
+          anchor/target/idl/
+          anchor/src/client/js/generated/
+        retention-days: 7
+
+  # Job 3: API Gateway Testing and Building
+  api-gateway:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Cache Cargo dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          api-gateway/target/
+        key: ${{ runner.os }}-cargo-api-${{ hashFiles('api-gateway/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-api-
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libssl-dev libpq-dev
+
+    - name: Check Rust formatting
+      run: |
+        cd api-gateway
+        cargo fmt --all -- --check
+
+    - name: Rust clippy
+      run: |
+        cd api-gateway
+        cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Build API Gateway
+      run: |
+        cd api-gateway
+        cargo build --release
+      env:
+        SQLX_OFFLINE: true
+
+    - name: Test API Gateway
+      run: |
+        cd api-gateway
+        cargo test
+      env:
+        SQLX_OFFLINE: true
+
+    - name: Upload API Gateway artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: api-gateway-binary
+        path: api-gateway/target/release/api-gateway
+        retention-days: 7
+
+  # Job 4: Integration and Summary
+  integration:
+    runs-on: ubuntu-latest
+    needs: [frontend, anchor, api-gateway]
+    if: always()
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Create build summary
+      run: |
+        echo "# GridTokenX Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Build Status" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ needs.frontend.result }}" == "success" ]]; then
+          echo "Frontend: **PASSED**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "Frontend: **FAILED**" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [[ "${{ needs.anchor.result }}" == "success" ]]; then
+          echo "Anchor Programs: **PASSED**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "Anchor Programs: **FAILED**" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [[ "${{ needs.api-gateway.result }}" == "success" ]]; then
+          echo "API Gateway: **PASSED**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "API Gateway: **FAILED**" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Artifacts Generated" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -d "frontend-dist" ]; then
+          echo "Frontend build: $(du -sh frontend-dist/ 2>/dev/null | cut -f1 || echo 'N/A')" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ -d "anchor-artifacts" ]; then
+          echo "Anchor programs: $(find anchor-artifacts/ -name "*.so" 2>/dev/null | wc -l || echo '0') programs" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ -f "api-gateway-binary/api-gateway" ]; then
+          echo "API Gateway binary: $(ls -lah api-gateway-binary/api-gateway 2>/dev/null | awk '{print $5}' || echo 'N/A')" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## P2P Energy Trading System Components" >> $GITHUB_STEP_SUMMARY
+        echo "- **Registry Program**: User and meter management" >> $GITHUB_STEP_SUMMARY
+        echo "- **Energy Token Program**: REC token handling" >> $GITHUB_STEP_SUMMARY
+        echo "- **Trading Program**: P2P energy marketplace" >> $GITHUB_STEP_SUMMARY
+        echo "- **Oracle Program**: AMI data validation" >> $GITHUB_STEP_SUMMARY
+        echo "- **Governance Program**: System administration" >> $GITHUB_STEP_SUMMARY
+
+    - name: Set overall status
+      run: |
+        if [[ "${{ needs.frontend.result }}" == "success" && "${{ needs.anchor.result }}" == "success" && "${{ needs.api-gateway.result }}" == "success" ]]; then
+          echo "BUILD_STATUS=success" >> $GITHUB_ENV
+        else
+          echo "BUILD_STATUS=failure" >> $GITHUB_ENV
+          exit 1
+        fi
