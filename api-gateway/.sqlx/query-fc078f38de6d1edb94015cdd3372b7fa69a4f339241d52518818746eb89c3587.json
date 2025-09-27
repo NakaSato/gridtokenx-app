@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            date_trunc($1, timestamp) as bucket,\n            COUNT(*)::bigint as reading_count\n        FROM energy_readings \n        WHERE meter_id = $2 \n        AND timestamp >= $3 \n        AND timestamp <= $4\n        GROUP BY bucket\n        ORDER BY bucket DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "bucket",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "reading_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "fc078f38de6d1edb94015cdd3372b7fa69a4f339241d52518818746eb89c3587"
+}

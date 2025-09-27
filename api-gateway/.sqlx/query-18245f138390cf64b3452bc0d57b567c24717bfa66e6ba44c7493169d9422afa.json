@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO blockchain_transactions \n        (signature, user_id, program_id, instruction_name, status, compute_units_consumed, submitted_at)\n        VALUES ($1, $2, $3, $4, 'pending', $5, NOW())\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "18245f138390cf64b3452bc0d57b567c24717bfa66e6ba44c7493169d9422afa"
+}

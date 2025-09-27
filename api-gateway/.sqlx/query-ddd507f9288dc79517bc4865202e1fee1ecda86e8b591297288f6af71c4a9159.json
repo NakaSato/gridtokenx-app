@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO energy_readings (\n            id, meter_id, timestamp, energy_generated, energy_consumed, \n            solar_irradiance, temperature, metadata, created_at\n        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Timestamptz",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Jsonb",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ddd507f9288dc79517bc4865202e1fee1ecda86e8b591297288f6af71c4a9159"
+}

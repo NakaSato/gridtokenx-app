@@ -1,0 +1,37 @@
+# Development Dockerfile for API Gateway
+# Optimized for fast rebuilds and development workflow
+
+FROM rust:1.89-slim
+
+# Install development dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install cargo tools for development
+RUN cargo install cargo-watch
+
+# Create app directory
+WORKDIR /app
+
+# Copy API Gateway Cargo.toml for dependency caching
+COPY api-gateway/Cargo.toml ./Cargo.toml
+
+# Create empty src directory for caching
+RUN mkdir -p src && echo "fn main() {}" > src/main.rs
+
+# Build dependencies
+RUN cargo fetch && cargo build && rm -rf src/
+
+# Copy source code
+COPY api-gateway/src ./src/
+COPY api-gateway/migrations ./migrations/
+
+# Expose port
+EXPOSE 8080
+
+# Use cargo watch for development
+CMD ["cargo", "watch", "-x", "run"]

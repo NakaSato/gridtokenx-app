@@ -1,0 +1,6 @@
+kafka-python==2.0.2
+psycopg2-binary==2.9.7
+redis==4.6.0
+requests==2.31.0
+python-dotenv==1.0.0
+schedule==1.2.0

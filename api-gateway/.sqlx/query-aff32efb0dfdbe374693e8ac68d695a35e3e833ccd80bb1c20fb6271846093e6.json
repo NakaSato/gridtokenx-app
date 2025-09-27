@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, meter_id, timestamp, energy_generated, energy_consumed, solar_irradiance, temperature, metadata, created_at FROM energy_readings WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "meter_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "timestamp",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "energy_generated",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "energy_consumed",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "solar_irradiance",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "temperature",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "metadata",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "aff32efb0dfdbe374693e8ac68d695a35e3e833ccd80bb1c20fb6271846093e6"
+}

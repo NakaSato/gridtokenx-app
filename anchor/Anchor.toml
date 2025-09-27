@@ -6,7 +6,11 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-gridtokenxapp = "Count3AcZucFDPSFBAeHkQ6AvttieKUkyJ8HiQGhQwe"
+registry = "BkZ9cBB3FFGXxJPw5JTJAbVAQYaDBeoQKoSL7b5u5Snv"
+energy_token = "J61eiwojt9zA1TP6t9M9wEDmiDek4QNEY2HiAfunHs7"
+oracle = "7sA8No5jojLboTzQQTU3fiAL8kGAjTzPgXtaMEYNKPEC"
+trading = "UbU6TWh6YP4kYQuj8t7xiNg65NdEQF9kfAKa4aS85iS"
+governance = "8SD7rh3fMtLsS9ciVKvyhVUkHimq7TEfgfE4AqUi2Lxt"
 
 [registry]
 url = "https://api.apr.dev"

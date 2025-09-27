@@ -1,0 +1,82 @@
+[package]
+name = "api-gateway"
+version = "0.1.0"
+edition = "2021"
+description = "API Gateway for P2P Energy Trading System - Engineering Department"
+authors = ["Engineering Department <eng-dept@campus.local>"]
+license = "MIT"
+
+[[bin]]
+name = "api-gateway"
+path = "src/main.rs"
+
+[dependencies]
+# Web Framework
+axum = { version = "0.7", features = ["macros"] }
+tower = { version = "0.4", features = ["util", "timeout", "load-shed", "limit"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "timeout", "compression-gzip"] }
+hyper = { version = "1.0", features = ["full"] }
+
+# Async Runtime
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+
+# Database
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls", "chrono", "uuid", "bigdecimal", "migrate"] }
+bigdecimal = { version = "0.4", features = ["serde"] }
+
+# Blockchain (to be added in Phase 2)
+# solana-client = "1.17"
+# solana-sdk = "1.17" 
+# anchor-client = "0.30"
+# anchor-lang = "0.30"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Authentication
+jsonwebtoken = "9.0"
+bcrypt = "0.15"
+
+# Caching
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+metrics = "0.22"
+metrics-exporter-prometheus = "0.13"
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+rust_decimal = { version = "1.33", features = ["serde-float"] }
+anyhow = "1.0"
+thiserror = "1.0"
+config = "0.14"
+dotenv = "0.15"
+sha2 = "0.10"
+rand = "0.8"
+
+# HTTP Client
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# Validation
+validator = { version = "0.18", features = ["derive"] }
+
+# Blockchain utilities
+bs58 = "0.5"
+
+[dev-dependencies]
+tokio-test = "0.4"
+testcontainers = "0.16"
+wiremock = "0.5"
+criterion = "0.5"
+proptest = "1.4"
+tempfile = "3.8"
+once_cell = "1.19"
+
+[features]
+default = []
+test-utils = []

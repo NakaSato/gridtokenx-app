@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO trading_orders (\n            id, user_id, order_type, side, energy_amount, price_per_kwh, \n            filled_amount, status, expires_at, created_at\n        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "order_type_enum",
+            "kind": {
+              "Enum": [
+                "market",
+                "limit"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "order_side_enum",
+            "kind": {
+              "Enum": [
+                "buy",
+                "sell"
+              ]
+            }
+          }
+        },
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        {
+          "Custom": {
+            "name": "order_status_enum",
+            "kind": {
+              "Enum": [
+                "pending",
+                "active",
+                "filled",
+                "cancelled",
+                "expired"
+              ]
+            }
+          }
+        },
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "eaa4ec52afd9a1fdda7dd2456067ae3a359d9a2154128397ea9db7bed528b915"
+}

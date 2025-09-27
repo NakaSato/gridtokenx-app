@@ -1,0 +1,32 @@
+apiVersion: 1
+
+datasources:
+  - name: PostgreSQL
+    type: postgres
+    url: postgres:5432
+    database: p2p_energy_trading
+    user: p2p_user
+    secureJsonData:
+      password: p2p_password
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 0
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+
+  - name: TimescaleDB
+    type: postgres
+    url: timescaledb:5432
+    database: p2p_timeseries
+    user: timescale_user
+    secureJsonData:
+      password: timescale_password
+    jsonData:
+      sslmode: disable
+      timescaledb: true
+
+  - name: Prometheus
+    type: prometheus
+    url: http://prometheus:9090
+    access: proxy
+    isDefault: true
