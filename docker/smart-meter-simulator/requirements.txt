@@ -1,6 +1,24 @@
+# Enhanced Smart Meter Simulator Dependencies
 kafka-python==2.0.2
 psycopg2-binary==2.9.7
 redis==4.6.0
 requests==2.31.0
 python-dotenv==1.0.0
 schedule==1.2.0
+
+# Enhanced features for P2P Energy Trading
+numpy==1.24.3
+pandas==2.0.3
+scipy==1.11.1
+matplotlib==3.7.2
+seaborn==0.12.2
+sqlalchemy==2.0.19
+pydantic==2.1.1
+structlog==23.1.0
+prometheus-client==0.17.1
+asyncio-mqtt==0.13.0
+aiohttp==3.8.5
+
+# Testing and development
+pytest==7.4.0
+pytest-asyncio==0.21.1

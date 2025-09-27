@@ -28,7 +28,7 @@ import {
   type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableSignerAccount,
-} from 'gill';
+} from '@solana/kit';
 import { GRIDTOKENXAPP_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 

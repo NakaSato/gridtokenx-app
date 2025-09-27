@@ -4,22 +4,29 @@ FROM node:20-alpine as builder
 # Set working directory
 WORKDIR /app
 
-# Copy package files first for better layer caching
-COPY package.json pnpm-lock.yaml ./
+# Copy root package files for workspace setup
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Copy frontend package files
+COPY frontend/package.json ./frontend/
 
 # Install pnpm
 RUN npm install -g pnpm
 
-# Install ALL dependencies (including devDependencies for build)
+# Install dependencies using workspace
 RUN pnpm install --frozen-lockfile
 
-# Copy source code
-COPY . .
+# Copy frontend source code
+COPY frontend/ ./frontend/
+
+# Copy anchor exports for frontend integration
+COPY anchor/src/gridtokenxapp-exports.ts ./anchor/src/
 
 # Copy production environment variables
-COPY docker/frontend/.env.production .env.production
+COPY docker/frontend/.env.production ./frontend/.env.production
 
-# Build the application for production
+# Build the frontend application
+WORKDIR /app/frontend
 RUN pnpm run build
 
 # Production runtime stage
@@ -37,7 +44,7 @@ COPY docker/frontend/healthcheck.sh /usr/local/bin/healthcheck.sh
 RUN chmod +x /usr/local/bin/healthcheck.sh
 
 # Copy built application from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 
 # Set proper permissions for nginx content
 RUN chmod -R 755 /usr/share/nginx/html

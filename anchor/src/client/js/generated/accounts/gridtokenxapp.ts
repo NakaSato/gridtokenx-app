@@ -33,7 +33,7 @@ import {
   type MaybeAccount,
   type MaybeEncodedAccount,
   type ReadonlyUint8Array,
-} from 'gill';
+} from '@solana/kit';
 
 export const GRIDTOKENXAPP_DISCRIMINATOR = new Uint8Array([
   255, 176, 4, 245, 188, 253, 124, 25,

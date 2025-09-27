@@ -12,10 +12,15 @@ export default defineConfig({
     react(),
     tailwindcss(),
     viteTsconfigPaths({
-      //
       root: resolve(__dirname),
     }),
   ],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src'),
+      '@project/anchor': resolve(__dirname, '../anchor/src/gridtokenxapp-exports'),
+    },
+  },
   test: {
     globals: true,
   },

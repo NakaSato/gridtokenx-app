@@ -7,6 +7,8 @@ const links: { label: string; path: string }[] = [
   { label: 'Home', path: '/' },
   { label: 'Account', path: '/account' },
   { label: 'Gridtokenxapp Program', path: '/gridtokenxapp' },
+  { label: 'Energy Trading', path: '/energy-trading' },
+  { label: 'PoA Governance', path: '/governance' },
 ]
 
 export function App() {

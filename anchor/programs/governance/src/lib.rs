@@ -2,308 +2,291 @@ use anchor_lang::prelude::*;
 
 declare_id!("EAcyEzfXXJCDnjZKUrgHsBEEHmnozZJXKs2wdW3xnWgb");
 
-/// University authority public key (hardcoded for demo)
-pub const UNIVERSITY_AUTHORITY_PUBKEY: Pubkey = Pubkey::new_from_array([1u8; 32]);
-
 #[program]
 pub mod governance {
     use super::*;
     
-    /// Simple initialization for testing
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    /// Initialize PoA with single Engineering Department authority for ERC
+    pub fn initialize_poa(ctx: Context<InitializePoa>) -> Result<()> {
         let poa_config = &mut ctx.accounts.poa_config;
-        poa_config.university_authority = ctx.accounts.authority.key();
-        poa_config.authorized_rec_validators = Vec::new();
-        poa_config.min_rec_validators = 1;
-        poa_config.emergency_paused = false;
-        poa_config.created_at = Clock::get()?.unix_timestamp;
+        let clock = Clock::get()?;
         
-        msg!("Governance program initialized");
+        poa_config.authority = ctx.accounts.authority.key();
+        poa_config.authority_name = "University Engineering Department".to_string();
+        poa_config.contact_info = "engineering_erc@utcc.ac.th".to_string();
+        poa_config.emergency_paused = false;
+        poa_config.emergency_timestamp = None;
+        poa_config.emergency_reason = None;
+        poa_config.created_at = clock.unix_timestamp;
+        poa_config.last_updated = clock.unix_timestamp;
+        poa_config.erc_validation_enabled = true;
+        poa_config.max_erc_amount = 1_000_000; // 1M kWh max per ERC
+        poa_config.total_ercs_issued = 0;
+        poa_config.total_ercs_validated = 0;
+        poa_config.version = 1;
+        poa_config.delegation_enabled = false;
+        poa_config.oracle_authority = None;
+        poa_config.min_energy_amount = 100; // 100 kWh minimum
+        poa_config.erc_validity_period = 31_536_000; // 1 year in seconds
+        poa_config.maintenance_mode = false;
+        
+        emit!(PoAInitialized {
+            authority: ctx.accounts.authority.key(),
+            authority_name: "University Engineering Department".to_string(),
+            timestamp: clock.unix_timestamp,
+        });
+        
+        msg!("PoA governance initialized - Engineering Department as sole ERC authority");
+        msg!("Max ERC amount: {} kWh, Min amount: {} kWh", poa_config.max_erc_amount, poa_config.min_energy_amount);
         Ok(())
     }
 
-    /// Emergency pause functionality
-    pub fn emergency_pause(ctx: Context<EmergencyPause>) -> Result<()> {
+    /// Emergency pause functionality - Engineering Department only
+    pub fn emergency_pause(ctx: Context<EmergencyControl>) -> Result<()> {
         let poa_config = &mut ctx.accounts.poa_config;
         
-        require!(
-            ctx.accounts.authority.key() == poa_config.university_authority,
-            ErrorCode::UnauthorizedAuthority
-        );
+        require!(!poa_config.emergency_paused, GovernanceError::AlreadyPaused);
         
         poa_config.emergency_paused = true;
+        poa_config.emergency_timestamp = Some(Clock::get()?.unix_timestamp);
         
         emit!(EmergencyPauseActivated {
             authority: ctx.accounts.authority.key(),
             timestamp: Clock::get()?.unix_timestamp,
         });
         
-        msg!("Emergency pause activated");
+        msg!("Emergency pause activated by Engineering Department");
         Ok(())
     }
 
-    /// Emergency unpause functionality
-    pub fn emergency_unpause(ctx: Context<EmergencyUnpause>) -> Result<()> {
+    /// Emergency unpause functionality - Engineering Department only
+    pub fn emergency_unpause(ctx: Context<EmergencyControl>) -> Result<()> {
         let poa_config = &mut ctx.accounts.poa_config;
         
-        require!(
-            ctx.accounts.authority.key() == poa_config.university_authority,
-            ErrorCode::UnauthorizedAuthority
-        );
+        require!(poa_config.emergency_paused, GovernanceError::NotPaused);
         
         poa_config.emergency_paused = false;
+        poa_config.emergency_timestamp = None;
         
         emit!(EmergencyPauseDeactivated {
             authority: ctx.accounts.authority.key(),
             timestamp: Clock::get()?.unix_timestamp,
         });
         
-        msg!("Emergency pause deactivated");
+        msg!("Emergency pause deactivated by Engineering Department");
         Ok(())
     }
-    
-    /// Initialize PoA governance with REC validators
-    pub fn initialize_poa_with_rec(ctx: Context<InitializePoAWithRec>) -> Result<()> {
-        let poa_config = &mut ctx.accounts.poa_config;
-        
-        // Verify university authority
-        require!(
-            ctx.accounts.university_authority.key() == UNIVERSITY_AUTHORITY_PUBKEY,
-            ErrorCode::UnauthorizedAuthority
-        );
-        
-        poa_config.university_authority = ctx.accounts.university_authority.key();
-        poa_config.authorized_rec_validators = vec![
-            // University departments as REC certification authority
-            RecValidatorInfo {
-                pubkey: ctx.accounts.sustainability_validator.key(),
-                authority_name: "University Sustainability Office".to_string(),
-                certification_authority: true,
-                active: true,
-                added_at: Clock::get()?.unix_timestamp,
-            },
-            RecValidatorInfo {
-                pubkey: ctx.accounts.engineering_validator.key(),
-                authority_name: "University Engineering Department".to_string(),
-                certification_authority: true,
-                active: true,
-                added_at: Clock::get()?.unix_timestamp,
-            },
-            RecValidatorInfo {
-                pubkey: ctx.accounts.facilities_validator.key(),
-                authority_name: "University Facilities Management".to_string(),
-                certification_authority: true,
-                active: true,
-                added_at: Clock::get()?.unix_timestamp,
-            },
-        ];
-        poa_config.min_rec_validators = 2; // Minimum for REC consensus
-        poa_config.created_at = Clock::get()?.unix_timestamp;
-        
-        emit!(PoAInitialized {
-            authority: ctx.accounts.university_authority.key(),
-            validator_count: poa_config.authorized_rec_validators.len() as u8,
-            min_validators: poa_config.min_rec_validators,
-            timestamp: Clock::get()?.unix_timestamp,
-        });
-        
-        Ok(())
-    }
-    
-    /// Add a new authorized REC validator
-    pub fn add_authorized_rec_validator(
-        ctx: Context<AddRecValidator>,
-        validator_pubkey: Pubkey,
-        department: String,
+
+    /// Issue ERC (Energy Renewable Certificate) - Engineering Department only
+    pub fn issue_erc(
+        ctx: Context<IssueErc>,
+        certificate_id: String,
+        energy_amount: u64,
+        renewable_source: String,
+        validation_data: String,
     ) -> Result<()> {
         let poa_config = &mut ctx.accounts.poa_config;
+        let erc_certificate = &mut ctx.accounts.erc_certificate;
+        let clock = Clock::get()?;
         
-        // Only university authority can add validators
-        require!(
-            ctx.accounts.university_authority.key() == poa_config.university_authority,
-            ErrorCode::UnauthorizedAuthority
-        );
+        require!(!poa_config.emergency_paused, GovernanceError::SystemPaused);
+        require!(!poa_config.maintenance_mode, GovernanceError::MaintenanceMode);
+        require!(poa_config.erc_validation_enabled, GovernanceError::ErcValidationDisabled);
+        require!(energy_amount >= poa_config.min_energy_amount, GovernanceError::BelowMinimumEnergy);
+        require!(energy_amount <= poa_config.max_erc_amount, GovernanceError::ExceedsMaximumEnergy);
+        require!(certificate_id.len() <= 64, GovernanceError::CertificateIdTooLong);
+        require!(renewable_source.len() <= 64, GovernanceError::SourceNameTooLong);
         
-        require!(
-            !poa_config.authorized_rec_validators.iter().any(|v| v.pubkey == validator_pubkey),
-            ErrorCode::ValidatorAlreadyAuthorized
-        );
+        erc_certificate.certificate_id = certificate_id.clone();
+        erc_certificate.authority = ctx.accounts.authority.key();
+        erc_certificate.energy_amount = energy_amount;
+        erc_certificate.renewable_source = renewable_source.clone();
+        erc_certificate.validation_data = validation_data;
+        erc_certificate.issued_at = clock.unix_timestamp;
+        erc_certificate.status = ErcStatus::Valid;
+        erc_certificate.validated_for_trading = false;
+        erc_certificate.expires_at = Some(clock.unix_timestamp + poa_config.erc_validity_period);
         
-        require!(
-            poa_config.authorized_rec_validators.len() < PoAConfig::MAX_REC_VALIDATORS,
-            ErrorCode::MaxValidatorsExceeded
-        );
+        // Update statistics
+        poa_config.total_ercs_issued = poa_config.total_ercs_issued.saturating_add(1);
+        poa_config.last_updated = clock.unix_timestamp;
         
-        let new_validator = RecValidatorInfo {
-            pubkey: validator_pubkey,
-            authority_name: department,
-            certification_authority: true,
-            active: true,
-            added_at: Clock::get()?.unix_timestamp,
-        };
-        
-        poa_config.authorized_rec_validators.push(new_validator);
-        
-        emit!(RecValidatorAdded {
-            validator: validator_pubkey,
-            authority: ctx.accounts.university_authority.key(),
-            timestamp: Clock::get()?.unix_timestamp,
+        emit!(ErcIssued {
+            certificate_id,
+            authority: ctx.accounts.authority.key(),
+            energy_amount,
+            renewable_source,
+            timestamp: clock.unix_timestamp,
         });
         
+        msg!("ERC issued by Engineering Department: {} kWh from {} (ID: {})", 
+             energy_amount, erc_certificate.renewable_source, erc_certificate.certificate_id);
         Ok(())
     }
-    
-    /// Remove an authorized REC validator
-    pub fn remove_authorized_rec_validator(
-        ctx: Context<RemoveRecValidator>,
-        validator_pubkey: Pubkey,
-    ) -> Result<()> {
+
+    /// Validate ERC for trading - Engineering Department only
+    pub fn validate_erc_for_trading(ctx: Context<ValidateErc>) -> Result<()> {
         let poa_config = &mut ctx.accounts.poa_config;
+        let erc_certificate = &mut ctx.accounts.erc_certificate;
+        let clock = Clock::get()?;
         
-        require!(
-            ctx.accounts.university_authority.key() == poa_config.university_authority,
-            ErrorCode::UnauthorizedAuthority
-        );
+        require!(!poa_config.emergency_paused, GovernanceError::SystemPaused);
+        require!(!poa_config.maintenance_mode, GovernanceError::MaintenanceMode);
+        require!(erc_certificate.status == ErcStatus::Valid, GovernanceError::InvalidErcStatus);
+        require!(!erc_certificate.validated_for_trading, GovernanceError::AlreadyValidated);
         
-        require!(
-            poa_config.authorized_rec_validators.len() > poa_config.min_rec_validators as usize,
-            ErrorCode::InsufficientValidators
-        );
+        // Check expiration
+        if let Some(expires_at) = erc_certificate.expires_at {
+            require!(clock.unix_timestamp < expires_at, GovernanceError::ErcExpired);
+        }
         
-        let validator_exists = poa_config.authorized_rec_validators.iter().any(|v| v.pubkey == validator_pubkey);
-        require!(validator_exists, ErrorCode::ValidatorNotFound);
+        erc_certificate.validated_for_trading = true;
+        erc_certificate.trading_validated_at = Some(clock.unix_timestamp);
         
-        poa_config.authorized_rec_validators.retain(|v| v.pubkey != validator_pubkey);
+        // Update statistics
+        poa_config.total_ercs_validated = poa_config.total_ercs_validated.saturating_add(1);
+        poa_config.last_updated = clock.unix_timestamp;
         
-        emit!(RecValidatorRemoved {
-            validator: validator_pubkey,
-            authority: ctx.accounts.university_authority.key(),
-            timestamp: Clock::get()?.unix_timestamp,
+        emit!(ErcValidatedForTrading {
+            certificate_id: erc_certificate.certificate_id.clone(),
+            authority: ctx.accounts.authority.key(),
+            timestamp: clock.unix_timestamp,
         });
         
+        msg!("ERC validated for trading by Engineering Department (ID: {})", erc_certificate.certificate_id);
         Ok(())
     }
-    
-    /// Update minimum required REC validators
-    pub fn update_min_rec_validators(
-        ctx: Context<UpdateMinValidators>,
-        new_min: u8,
+
+    /// Update governance configuration - Engineering Department only
+    pub fn update_governance_config(
+        ctx: Context<UpdateGovernanceConfig>,
+        erc_validation_enabled: bool,
     ) -> Result<()> {
         let poa_config = &mut ctx.accounts.poa_config;
+        let clock = Clock::get()?;
         
-        require!(
-            ctx.accounts.university_authority.key() == poa_config.university_authority,
-            ErrorCode::UnauthorizedAuthority
-        );
+        let old_enabled = poa_config.erc_validation_enabled;
+        poa_config.erc_validation_enabled = erc_validation_enabled;
+        poa_config.last_updated = clock.unix_timestamp;
         
-        require!(
-            new_min > 0 && new_min <= poa_config.authorized_rec_validators.len() as u8,
-            ErrorCode::InvalidMinValidators
-        );
+        emit!(GovernanceConfigUpdated {
+            authority: ctx.accounts.authority.key(),
+            erc_validation_enabled,
+            old_enabled,
+            timestamp: clock.unix_timestamp,
+        });
         
-        let old_min = poa_config.min_rec_validators;
-        poa_config.min_rec_validators = new_min;
+        msg!("Governance configuration updated - ERC validation: {}", erc_validation_enabled);
+        Ok(())
+    }
+
+    /// Set maintenance mode - Engineering Department only
+    pub fn set_maintenance_mode(
+        ctx: Context<UpdateGovernanceConfig>,
+        maintenance_enabled: bool,
+    ) -> Result<()> {
+        let poa_config = &mut ctx.accounts.poa_config;
+        let clock = Clock::get()?;
         
-        emit!(MinValidatorsUpdated {
+        poa_config.maintenance_mode = maintenance_enabled;
+        poa_config.last_updated = clock.unix_timestamp;
+        
+        emit!(MaintenanceModeUpdated {
+            authority: ctx.accounts.authority.key(),
+            maintenance_enabled,
+            timestamp: clock.unix_timestamp,
+        });
+        
+        msg!("Maintenance mode {}", if maintenance_enabled { "enabled" } else { "disabled" });
+        Ok(())
+    }
+
+    /// Update ERC limits - Engineering Department only
+    pub fn update_erc_limits(
+        ctx: Context<UpdateGovernanceConfig>,
+        min_energy_amount: u64,
+        max_erc_amount: u64,
+        erc_validity_period: i64,
+    ) -> Result<()> {
+        let poa_config = &mut ctx.accounts.poa_config;
+        let clock = Clock::get()?;
+        
+        require!(min_energy_amount > 0, GovernanceError::InvalidMinimumEnergy);
+        require!(max_erc_amount > min_energy_amount, GovernanceError::InvalidMaximumEnergy);
+        require!(erc_validity_period > 0, GovernanceError::InvalidValidityPeriod);
+        
+        let old_min = poa_config.min_energy_amount;
+        let old_max = poa_config.max_erc_amount;
+        let old_validity = poa_config.erc_validity_period;
+        
+        poa_config.min_energy_amount = min_energy_amount;
+        poa_config.max_erc_amount = max_erc_amount;
+        poa_config.erc_validity_period = erc_validity_period;
+        poa_config.last_updated = clock.unix_timestamp;
+        
+        emit!(ErcLimitsUpdated {
+            authority: ctx.accounts.authority.key(),
             old_min,
-            new_min,
-            authority: ctx.accounts.university_authority.key(),
-            timestamp: Clock::get()?.unix_timestamp,
+            new_min: min_energy_amount,
+            old_max,
+            new_max: max_erc_amount,
+            old_validity,
+            new_validity: erc_validity_period,
+            timestamp: clock.unix_timestamp,
         });
         
+        msg!("ERC limits updated - Min: {} kWh, Max: {} kWh, Validity: {} seconds", 
+             min_energy_amount, max_erc_amount, erc_validity_period);
         Ok(())
     }
-    
-    /// Deactivate a REC validator (suspend without removing)
-    pub fn deactivate_rec_validator(
-        ctx: Context<DeactivateRecValidator>,
-        validator_pubkey: Pubkey,
+
+    /// Update authority contact info - Engineering Department only
+    pub fn update_authority_info(
+        ctx: Context<UpdateGovernanceConfig>,
+        contact_info: String,
     ) -> Result<()> {
         let poa_config = &mut ctx.accounts.poa_config;
+        let clock = Clock::get()?;
         
-        require!(
-            ctx.accounts.university_authority.key() == poa_config.university_authority,
-            ErrorCode::UnauthorizedAuthority
-        );
+        require!(contact_info.len() <= 128, GovernanceError::ContactInfoTooLong);
         
-        let active_count = poa_config.authorized_rec_validators.iter().filter(|v| v.active).count();
-        require!(
-            active_count > poa_config.min_rec_validators as usize,
-            ErrorCode::InsufficientActiveValidators
-        );
+        let old_contact = poa_config.contact_info.clone();
+        poa_config.contact_info = contact_info.clone();
+        poa_config.last_updated = clock.unix_timestamp;
         
-        let validator = poa_config.authorized_rec_validators.iter_mut()
-            .find(|v| v.pubkey == validator_pubkey)
-            .ok_or(ErrorCode::ValidatorNotFound)?;
-        
-        require!(validator.active, ErrorCode::ValidatorAlreadyInactive);
-        
-        validator.active = false;
-        
-        emit!(RecValidatorDeactivated {
-            validator: validator_pubkey,
-            authority: ctx.accounts.university_authority.key(),
-            timestamp: Clock::get()?.unix_timestamp,
+        emit!(AuthorityInfoUpdated {
+            authority: ctx.accounts.authority.key(),
+            old_contact,
+            new_contact: contact_info,
+            timestamp: clock.unix_timestamp,
         });
         
+        msg!("Authority contact information updated");
         Ok(())
     }
-    
-    /// Reactivate a REC validator
-    pub fn reactivate_rec_validator(
-        ctx: Context<ReactivateRecValidator>,
-        validator_pubkey: Pubkey,
-    ) -> Result<()> {
-        let poa_config = &mut ctx.accounts.poa_config;
-        
-        require!(
-            ctx.accounts.university_authority.key() == poa_config.university_authority,
-            ErrorCode::UnauthorizedAuthority
-        );
-        
-        let validator = poa_config.authorized_rec_validators.iter_mut()
-            .find(|v| v.pubkey == validator_pubkey)
-            .ok_or(ErrorCode::ValidatorNotFound)?;
-        
-        require!(!validator.active, ErrorCode::ValidatorAlreadyActive);
-        
-        validator.active = true;
-        
-        emit!(RecValidatorReactivated {
-            validator: validator_pubkey,
-            authority: ctx.accounts.university_authority.key(),
-            timestamp: Clock::get()?.unix_timestamp,
-        });
-        
-        Ok(())
-    }
-    
-    /// Get validator information
-    pub fn get_validator_info(ctx: Context<GetValidatorInfo>) -> Result<Vec<RecValidatorInfo>> {
-        let poa_config = &ctx.accounts.poa_config;
-        Ok(poa_config.authorized_rec_validators.clone())
-    }
-    
-    /// Verify if a validator is authorized and active
-    pub fn is_authorized_rec_validator(
-        ctx: Context<IsAuthorizedRecValidator>,
-        validator_pubkey: Pubkey,
-    ) -> Result<bool> {
+
+    /// Get governance statistics
+    pub fn get_governance_stats(ctx: Context<GetGovernanceStats>) -> Result<GovernanceStats> {
         let poa_config = &ctx.accounts.poa_config;
         
-        let is_authorized = poa_config.authorized_rec_validators.iter().any(|v| 
-            v.pubkey == validator_pubkey && 
-            v.active && 
-            v.certification_authority
-        );
-        
-        Ok(is_authorized)
+        Ok(GovernanceStats {
+            total_ercs_issued: poa_config.total_ercs_issued,
+            total_ercs_validated: poa_config.total_ercs_validated,
+            erc_validation_enabled: poa_config.erc_validation_enabled,
+            emergency_paused: poa_config.emergency_paused,
+            maintenance_mode: poa_config.maintenance_mode,
+            min_energy_amount: poa_config.min_energy_amount,
+            max_erc_amount: poa_config.max_erc_amount,
+            erc_validity_period: poa_config.erc_validity_period,
+            created_at: poa_config.created_at,
+            last_updated: poa_config.last_updated,
+        })
     }
 }
 
-// Account structs
+// Account structures for single authority PoA
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+pub struct InitializePoa<'info> {
     #[account(
         init,
         payer = authority,
@@ -312,140 +295,205 @@ pub struct Initialize<'info> {
         bump
     )]
     pub poa_config: Account<'info, PoAConfig>,
-    
     #[account(mut)]
     pub authority: Signer<'info>,
-    
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-pub struct EmergencyPause<'info> {
-    #[account(mut)]
+pub struct EmergencyControl<'info> {
+    #[account(
+        mut,
+        seeds = [b"poa_config"],
+        bump,
+        has_one = authority @ GovernanceError::UnauthorizedAuthority
+    )]
     pub poa_config: Account<'info, PoAConfig>,
-    
-    #[account(constraint = authority.key() == UNIVERSITY_AUTHORITY_PUBKEY)]
     pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
-pub struct EmergencyUnpause<'info> {
-    #[account(mut)]
+#[instruction(certificate_id: String)]
+pub struct IssueErc<'info> {
+    #[account(
+        seeds = [b"poa_config"],
+        bump,
+        has_one = authority @ GovernanceError::UnauthorizedAuthority
+    )]
     pub poa_config: Account<'info, PoAConfig>,
-    
-    #[account(constraint = authority.key() == UNIVERSITY_AUTHORITY_PUBKEY)]
-    pub authority: Signer<'info>,
-}
-#[derive(Accounts)]
-pub struct InitializePoAWithRec<'info> {
     #[account(
         init,
-        payer = university_authority,
-        space = 8 + PoAConfig::LEN,
+        payer = authority,
+        space = 8 + ErcCertificate::LEN,
+        seeds = [b"erc_certificate", certificate_id.as_bytes()],
+        bump
+    )]
+    pub erc_certificate: Account<'info, ErcCertificate>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ValidateErc<'info> {
+    #[account(
+        seeds = [b"poa_config"],
+        bump,
+        has_one = authority @ GovernanceError::UnauthorizedAuthority
+    )]
+    pub poa_config: Account<'info, PoAConfig>,
+    #[account(
+        mut,
+        seeds = [b"erc_certificate", erc_certificate.certificate_id.as_bytes()],
+        bump
+    )]
+    pub erc_certificate: Account<'info, ErcCertificate>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateGovernanceConfig<'info> {
+    #[account(
+        mut,
+        seeds = [b"poa_config"],
+        bump,
+        has_one = authority @ GovernanceError::UnauthorizedAuthority
+    )]
+    pub poa_config: Account<'info, PoAConfig>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct GetGovernanceStats<'info> {
+    #[account(
         seeds = [b"poa_config"],
         bump
     )]
     pub poa_config: Account<'info, PoAConfig>,
-    
-    #[account(mut, constraint = university_authority.key() == UNIVERSITY_AUTHORITY_PUBKEY)]
-    pub university_authority: Signer<'info>,
-    
-    /// CHECK: University Sustainability Office validator
-    pub sustainability_validator: AccountInfo<'info>,
-    /// CHECK: University Engineering Department validator
-    pub engineering_validator: AccountInfo<'info>,
-    /// CHECK: University Facilities Management validator
-    pub facilities_validator: AccountInfo<'info>,
-    
-    pub system_program: Program<'info, System>,
 }
 
-#[derive(Accounts)]
-pub struct AddRecValidator<'info> {
-    #[account(mut, has_one = university_authority @ ErrorCode::UnauthorizedAuthority)]
-    pub poa_config: Account<'info, PoAConfig>,
-    
-    #[account(constraint = university_authority.key() == UNIVERSITY_AUTHORITY_PUBKEY)]
-    pub university_authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct RemoveRecValidator<'info> {
-    #[account(mut, has_one = university_authority @ ErrorCode::UnauthorizedAuthority)]
-    pub poa_config: Account<'info, PoAConfig>,
-    
-    #[account(constraint = university_authority.key() == UNIVERSITY_AUTHORITY_PUBKEY)]
-    pub university_authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct UpdateMinValidators<'info> {
-    #[account(mut, has_one = university_authority @ ErrorCode::UnauthorizedAuthority)]
-    pub poa_config: Account<'info, PoAConfig>,
-    
-    #[account(constraint = university_authority.key() == UNIVERSITY_AUTHORITY_PUBKEY)]
-    pub university_authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct DeactivateRecValidator<'info> {
-    #[account(mut, has_one = university_authority @ ErrorCode::UnauthorizedAuthority)]
-    pub poa_config: Account<'info, PoAConfig>,
-    
-    #[account(constraint = university_authority.key() == UNIVERSITY_AUTHORITY_PUBKEY)]
-    pub university_authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct ReactivateRecValidator<'info> {
-    #[account(mut, has_one = university_authority @ ErrorCode::UnauthorizedAuthority)]
-    pub poa_config: Account<'info, PoAConfig>,
-    
-    #[account(constraint = university_authority.key() == UNIVERSITY_AUTHORITY_PUBKEY)]
-    pub university_authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct GetValidatorInfo<'info> {
-    pub poa_config: Account<'info, PoAConfig>,
-}
-
-#[derive(Accounts)]
-pub struct IsAuthorizedRecValidator<'info> {
-    pub poa_config: Account<'info, PoAConfig>,
-}
-
-
-
-// Data structs
+// Data structures for single authority PoA
 #[account]
 pub struct PoAConfig {
-    pub university_authority: Pubkey,
-    pub authorized_rec_validators: Vec<RecValidatorInfo>,
-    pub min_rec_validators: u8,
+    /// Single authority - Engineering Department
+    pub authority: Pubkey,
+    /// Authority name for identification
+    pub authority_name: String,
+    /// Department contact information
+    pub contact_info: String,
+    /// Emergency pause status
     pub emergency_paused: bool,
+    /// Emergency pause timestamp
+    pub emergency_timestamp: Option<i64>,
+    /// Emergency pause reason
+    pub emergency_reason: Option<String>,
+    /// When governance was initialized
     pub created_at: i64,
+    /// Last updated timestamp
+    pub last_updated: i64,
+    /// Whether ERC validation is enabled
+    pub erc_validation_enabled: bool,
+    /// Maximum ERC amount that can be issued per transaction
+    pub max_erc_amount: u64,
+    /// Total ERCs issued
+    pub total_ercs_issued: u64,
+    /// Total ERCs validated for trading
+    pub total_ercs_validated: u64,
+    /// Governance version for upgrades
+    pub version: u8,
+    /// Whether the authority can delegate ERC validation
+    pub delegation_enabled: bool,
+    /// Oracle authority for AMI data validation
+    pub oracle_authority: Option<Pubkey>,
+    /// Minimum energy amount for ERC issuance (kWh)
+    pub min_energy_amount: u64,
+    /// ERC certificate validity period (seconds)
+    pub erc_validity_period: i64,
+    /// System maintenance mode
+    pub maintenance_mode: bool,
 }
 
 impl PoAConfig {
-    pub const MAX_REC_VALIDATORS: usize = 10;
-    pub const LEN: usize = 32 + 4 + (RecValidatorInfo::LEN * Self::MAX_REC_VALIDATORS) + 1 + 1 + 8;
+    pub const LEN: usize = 
+        32 +    // authority
+        64 +    // authority_name
+        128 +   // contact_info
+        1 +     // emergency_paused
+        9 +     // emergency_timestamp (Option<i64>)
+        132 +   // emergency_reason (Option<String>)
+        8 +     // created_at
+        8 +     // last_updated
+        1 +     // erc_validation_enabled
+        8 +     // max_erc_amount
+        8 +     // total_ercs_issued
+        8 +     // total_ercs_validated
+        1 +     // version
+        1 +     // delegation_enabled
+        33 +    // oracle_authority (Option<Pubkey>)
+        8 +     // min_energy_amount
+        8 +     // erc_validity_period
+        1;      // maintenance_mode
 }
 
+#[account]
+pub struct ErcCertificate {
+    /// Unique certificate identifier
+    pub certificate_id: String,
+    /// Issuing authority (Engineering Department)
+    pub authority: Pubkey,
+    /// Amount of renewable energy (kWh)
+    pub energy_amount: u64,
+    /// Source of renewable energy (solar, wind, etc.)
+    pub renewable_source: String,
+    /// Additional validation data
+    pub validation_data: String,
+    /// When the certificate was issued
+    pub issued_at: i64,
+    /// When the certificate expires
+    pub expires_at: Option<i64>,
+    /// Current status of the certificate
+    pub status: ErcStatus,
+    /// Whether validated for trading
+    pub validated_for_trading: bool,
+    /// When validated for trading
+    pub trading_validated_at: Option<i64>,
+}
+
+impl ErcCertificate {
+    pub const LEN: usize = 64 + 32 + 8 + 64 + 256 + 8 + 9 + 1 + 1 + 9;
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub enum ErcStatus {
+    Valid,
+    Expired,
+    Revoked,
+    Pending,
+}
+
+// Data structure for governance statistics
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct RecValidatorInfo {
-    pub pubkey: Pubkey,
-    pub authority_name: String, // e.g., "University Sustainability Office"
-    pub certification_authority: bool,
-    pub active: bool,
-    pub added_at: i64,
+pub struct GovernanceStats {
+    pub total_ercs_issued: u64,
+    pub total_ercs_validated: u64,
+    pub erc_validation_enabled: bool,
+    pub emergency_paused: bool,
+    pub maintenance_mode: bool,
+    pub min_energy_amount: u64,
+    pub max_erc_amount: u64,
+    pub erc_validity_period: i64,
+    pub created_at: i64,
+    pub last_updated: i64,
 }
 
-impl RecValidatorInfo {
-    pub const LEN: usize = 32 + 64 + 1 + 1 + 8; // pubkey + authority_name + certification_authority + active + added_at
+// Events for single authority PoA
+#[event]
+pub struct PoAInitialized {
+    pub authority: Pubkey,
+    pub authority_name: String,
+    pub timestamp: i64,
 }
 
-// Events
 #[event]
 pub struct EmergencyPauseActivated {
     pub authority: Pubkey,
@@ -459,68 +507,91 @@ pub struct EmergencyPauseDeactivated {
 }
 
 #[event]
-pub struct PoAInitialized {
+pub struct ErcIssued {
+    pub certificate_id: String,
     pub authority: Pubkey,
-    pub validator_count: u8,
-    pub min_validators: u8,
+    pub energy_amount: u64,
+    pub renewable_source: String,
     pub timestamp: i64,
 }
 
 #[event]
-pub struct RecValidatorAdded {
-    pub validator: Pubkey,
-    pub authority: Pubkey,
-    pub timestamp: i64,
-}
-
-#[event]
-pub struct RecValidatorRemoved {
-    pub validator: Pubkey,
+pub struct ErcValidatedForTrading {
+    pub certificate_id: String,
     pub authority: Pubkey,
     pub timestamp: i64,
 }
 
 #[event]
-pub struct MinValidatorsUpdated {
-    pub old_min: u8,
-    pub new_min: u8,
+pub struct GovernanceConfigUpdated {
     pub authority: Pubkey,
+    pub erc_validation_enabled: bool,
+    pub old_enabled: bool,
     pub timestamp: i64,
 }
 
 #[event]
-pub struct RecValidatorDeactivated {
-    pub validator: Pubkey,
+pub struct MaintenanceModeUpdated {
     pub authority: Pubkey,
+    pub maintenance_enabled: bool,
     pub timestamp: i64,
 }
 
 #[event]
-pub struct RecValidatorReactivated {
-    pub validator: Pubkey,
+pub struct ErcLimitsUpdated {
     pub authority: Pubkey,
+    pub old_min: u64,
+    pub new_min: u64,
+    pub old_max: u64,
+    pub new_max: u64,
+    pub old_validity: i64,
+    pub new_validity: i64,
     pub timestamp: i64,
 }
 
-// Errors
+#[event]
+pub struct AuthorityInfoUpdated {
+    pub authority: Pubkey,
+    pub old_contact: String,
+    pub new_contact: String,
+    pub timestamp: i64,
+}
+
+// Error codes for single authority PoA
 #[error_code]
-pub enum ErrorCode {
+pub enum GovernanceError {
     #[msg("Unauthorized authority")]
     UnauthorizedAuthority,
-    #[msg("Validator already authorized")]
-    ValidatorAlreadyAuthorized,
-    #[msg("Validator not found")]
-    ValidatorNotFound,
-    #[msg("Insufficient validators")]
-    InsufficientValidators,
-    #[msg("Invalid minimum validators")]
-    InvalidMinValidators,
-    #[msg("Maximum validators exceeded")]
-    MaxValidatorsExceeded,
-    #[msg("Insufficient active validators")]
-    InsufficientActiveValidators,
-    #[msg("Validator already inactive")]
-    ValidatorAlreadyInactive,
-    #[msg("Validator already active")]
-    ValidatorAlreadyActive,
+    #[msg("System is already paused")]
+    AlreadyPaused,
+    #[msg("System is not paused")]
+    NotPaused,
+    #[msg("System is currently paused")]
+    SystemPaused,
+    #[msg("System is in maintenance mode")]
+    MaintenanceMode,
+    #[msg("ERC validation is disabled")]
+    ErcValidationDisabled,
+    #[msg("Invalid ERC status")]
+    InvalidErcStatus,
+    #[msg("ERC already validated")]
+    AlreadyValidated,
+    #[msg("Energy amount below minimum required")]
+    BelowMinimumEnergy,
+    #[msg("Energy amount exceeds maximum allowed")]
+    ExceedsMaximumEnergy,
+    #[msg("Certificate ID too long")]
+    CertificateIdTooLong,
+    #[msg("Renewable source name too long")]
+    SourceNameTooLong,
+    #[msg("ERC certificate has expired")]
+    ErcExpired,
+    #[msg("Invalid minimum energy amount")]
+    InvalidMinimumEnergy,
+    #[msg("Invalid maximum energy amount")]
+    InvalidMaximumEnergy,
+    #[msg("Invalid validity period")]
+    InvalidValidityPeriod,
+    #[msg("Contact information too long")]
+    ContactInfoTooLong,
 }

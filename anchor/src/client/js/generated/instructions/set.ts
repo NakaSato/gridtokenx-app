@@ -27,7 +27,7 @@ import {
   type InstructionWithData,
   type ReadonlyUint8Array,
   type WritableAccount,
-} from 'gill';
+} from '@solana/kit';
 import { GRIDTOKENXAPP_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 
