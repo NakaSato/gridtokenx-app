@@ -16,7 +16,7 @@ trading = "CEWpf4Rvm3SU2zQgwsQpi5EMYBUrWbKLcAhAT2ouVoWD"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localhost"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
