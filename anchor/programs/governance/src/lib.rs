@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("8SD7rh3fMtLsS9ciVKvyhVUkHimq7TEfgfE4AqUi2Lxt");
+declare_id!("EAcyEzfXXJCDnjZKUrgHsBEEHmnozZJXKs2wdW3xnWgb");
 
 /// University authority public key (hardcoded for demo)
 pub const UNIVERSITY_AUTHORITY_PUBKEY: Pubkey = Pubkey::new_from_array([1u8; 32]);
