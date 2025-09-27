@@ -1,23 +1,26 @@
 # Production-optimized Frontend Dockerfile
-FROM oven/bun:alpine as builder
+FROM node:20-alpine as builder
 
 # Set working directory
 WORKDIR /app
 
 # Copy package files first for better layer caching
-COPY frontend/package.json frontend/bun.lock ./
+COPY package.json pnpm-lock.yaml ./
+
+# Install pnpm
+RUN npm install -g pnpm
 
 # Install ALL dependencies (including devDependencies for build)
-RUN bun install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
-COPY frontend/ .
+COPY . .
 
 # Copy production environment variables
 COPY docker/frontend/.env.production .env.production
 
 # Build the application for production
-RUN bun run build
+RUN pnpm run build
 
 # Production runtime stage
 FROM nginx:alpine
