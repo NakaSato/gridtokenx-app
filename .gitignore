@@ -32,3 +32,9 @@ dist-ssr
 /anchor/target
 test-ledger
 **/*.rs.bk
+
+# Rust
+/api-gateway/target
+**/target/
+Cargo.lock
+**/*.rs.bk
