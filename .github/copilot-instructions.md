@@ -2,9 +2,9 @@
 
 ## Architecture Overview
 
-This is a **dual-architecture project** combining:
+This is a **P2P Energy Trading System** with dual-architecture:
 - **Frontend**: React 18+/Vite app with TypeScript using Gill Solana SDK and Wallet UI
-- **Backend**: Multi-program Anchor workspace with 5 Solana programs (energy-token, governance, oracle, registry, trading)
+- **Backend**: Multi-program Anchor workspace with 5 Solana programs for comprehensive energy trading
 
 **Key Integration Pattern**: Anchor programs → Codama code generation → React app consumption via generated TypeScript clients.
 
@@ -13,19 +13,35 @@ This is a **dual-architecture project** combining:
 ### 1. Program-First Development
 Always start with Anchor programs when adding new functionality:
 ```bash
-npm run setup  # Syncs program IDs, builds, generates TS clients
+npm run setup  # Syncs program IDs, builds, generates TS clients (CRITICAL after program changes)
 ```
 
 ### 2. Code Generation Pipeline
 - Anchor builds generate IDL files in `anchor/target/idl/`
 - Codama (via `anchor/codama.js`) generates TypeScript clients in `anchor/src/client/js/`
 - Frontend imports via `@project/anchor` alias from `anchor/src/gridtokenxapp-exports.ts`
+- **Note**: Local `create-codama-config.js` workaround for Gill issue #207
 
 ### 3. Required Commands After Program Changes
 ```bash
 npm run anchor-build    # Build Anchor programs
 npm run codama:js      # Generate TS clients
+npm run setup          # Complete pipeline (preferred)
 ```
+
+## Multi-Program Architecture (P2P Energy Trading)
+
+### 5 Core Programs:
+1. **energy-token** (`FaELH72fUMRaLTX3ersmQLr4purfHGvJccm1BXfDPL6r`) - Token management, REC validation
+2. **governance** (`EAcyEzfXXJCDnjZKUrgHsBEEHmnozZJXKs2wdW3xnWgb`) - Proof-of-Authority governance
+3. **oracle** (`G365L8A4Y3xmp5aN2GGLj2SJr5KetgE5F57PaFvCgSgG`) - AMI data processing, REC authority validation
+4. **registry** (`FSXdxk5uPUvJc51MzjtBaCDrFh7RSMcHFHKpzCG9LeuJ`) - Participant registration, smart meter management
+5. **trading** (`CEWpf4Rvm3SU2zQgwsQpi5EMYBUrWbKLcAhAT2ouVoWD`) - P2P energy trading, order matching
+
+### Smart Meter Integration
+- Simulator located in `docker/smart-meter-simulator/`
+- Python-based with weather simulation and prosumer/consumer capabilities
+- Grid operator manages meters for consumer/prosumer roles
 
 ## Project Structure Conventions
 
@@ -65,54 +81,52 @@ await signAndSend(instruction, signer)
 - Use `getGridtokenxappProgramAccounts()` helper from generated exports
 - All queries invalidate on cluster change via query keys: `['[program]', 'accounts', { cluster }]`
 
-## Critical Dependencies & Integrations
-
-### Gill SDK (Solana)
-- Core Solana client and utilities
-- **Note**: Local `create-codama-config.js` workaround for Gill issue #207
-
-### Multi-Program Anchor Workspace
-- 5 programs: energy-token, governance, oracle, registry, trading
-- Shared workspace in `anchor/Cargo.toml` with `members = ["programs/*"]`
-- Each program has independent `declare_id!()` and keypairs in `target/deploy/`
-
-### Tailwind + Shadcn
-- Components configured in `components.json` with New York style
-- Custom path aliases: `@/components`, `@/lib`, `@/ui`
-
 ## Development Environment Setup
 
-### Local Development
+### Local Development (Verified Working)
 ```bash
-npm run anchor-localnet  # Starts test validator with programs deployed
+npm run anchor-localnet  # Starts test validator at http://127.0.0.1:8899
 npm run dev             # Starts Vite dev server
 ```
 
-### Testing
+### Testing & Validation
 ```bash
 npm run anchor-test     # Runs Anchor program tests
+npm run anchor-build    # Verify build success
 ```
 
-### Deployment to Devnet
-```bash
-npm run anchor deploy --provider.cluster devnet
-```
+### REC Authority Validation
+- REC (Renewable Energy Certificate) operations are authority-only
+- Engineering Department has REC issuing authority
+- Authority validation required for REC operations
 
 ## Key Files That Define Architecture
 
+- `anchor/Anchor.toml` - Program IDs and cluster configuration
 - `anchor/codama.js` - Code generation configuration
 - `anchor/src/gridtokenxapp-exports.ts` - Main program exports and helpers
 - `src/components/app-providers.tsx` - Provider hierarchy setup
-- `src/features/*/data-access/use-*-program.ts` - Program integration patterns
-- `package.json` scripts - Essential development commands
+- `.env.example` - Complete environment configuration template
+- `docker/smart-meter-simulator/` - Smart meter simulation system
 
-## Common Patterns to Follow
+## Critical Development Patterns
 
-1. **Always run `npm run setup`** after program changes
+1. **Always run `npm run setup`** after program changes (syncs IDs, builds, generates clients)
 2. **Use generated instruction helpers** instead of raw instruction building
 3. **Follow feature/data-access/ui separation** for new features
 4. **Query invalidation on cluster/transaction changes** for real-time UI updates
 5. **Toast feedback** (`toastTx()`) for all transactions
 6. **Ed25519 polyfill** required for browser compatibility with `generateKeyPairSigner`
+7. **Authority-only operations** for REC validation and issuance
+
+## Environment Configuration
+
+The system supports comprehensive configuration via `.env.example`:
+- Program IDs for all 5 programs
+- Database connections (PostgreSQL, TimescaleDB)
+- Message queues (Redis, Kafka)
+- Smart meter simulation parameters
+- API gateway settings (Node.js and Rust)
+- REC authority validation settings
 
 When adding new programs or features, maintain the established patterns of code generation, feature separation, and React Query integration.
