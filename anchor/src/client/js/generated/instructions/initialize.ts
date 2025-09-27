@@ -24,12 +24,11 @@ import {
   type Instruction,
   type InstructionWithAccounts,
   type InstructionWithData,
-  type ReadonlyAccount,
+  type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
-  type WritableSignerAccount,
 } from '@solana/kit';
-import { GRIDTOKENXAPP_PROGRAM_ADDRESS } from '../programs';
+import { ENERGY_TOKEN_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 
 export const INITIALIZE_DISCRIMINATOR = new Uint8Array([
@@ -41,28 +40,17 @@ export function getInitializeDiscriminatorBytes() {
 }
 
 export type InitializeInstruction<
-  TProgram extends string = typeof GRIDTOKENXAPP_PROGRAM_ADDRESS,
-  TAccountPayer extends string | AccountMeta<string> = string,
-  TAccountGridtokenxapp extends string | AccountMeta<string> = string,
-  TAccountSystemProgram extends
-    | string
-    | AccountMeta<string> = '11111111111111111111111111111111',
+  TProgram extends string = typeof ENERGY_TOKEN_PROGRAM_ADDRESS,
+  TAccountAuthority extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
-      TAccountPayer extends string
-        ? WritableSignerAccount<TAccountPayer> &
-            AccountSignerMeta<TAccountPayer>
-        : TAccountPayer,
-      TAccountGridtokenxapp extends string
-        ? WritableSignerAccount<TAccountGridtokenxapp> &
-            AccountSignerMeta<TAccountGridtokenxapp>
-        : TAccountGridtokenxapp,
-      TAccountSystemProgram extends string
-        ? ReadonlyAccount<TAccountSystemProgram>
-        : TAccountSystemProgram,
+      TAccountAuthority extends string
+        ? ReadonlySignerAccount<TAccountAuthority> &
+            AccountSignerMeta<TAccountAuthority>
+        : TAccountAuthority,
       ...TRemainingAccounts,
     ]
   >;
@@ -94,81 +82,44 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
   );
 }
 
-export type InitializeInput<
-  TAccountPayer extends string = string,
-  TAccountGridtokenxapp extends string = string,
-  TAccountSystemProgram extends string = string,
-> = {
-  payer: TransactionSigner<TAccountPayer>;
-  gridtokenxapp: TransactionSigner<TAccountGridtokenxapp>;
-  systemProgram?: Address<TAccountSystemProgram>;
+export type InitializeInput<TAccountAuthority extends string = string> = {
+  authority: TransactionSigner<TAccountAuthority>;
 };
 
 export function getInitializeInstruction<
-  TAccountPayer extends string,
-  TAccountGridtokenxapp extends string,
-  TAccountSystemProgram extends string,
-  TProgramAddress extends Address = typeof GRIDTOKENXAPP_PROGRAM_ADDRESS,
+  TAccountAuthority extends string,
+  TProgramAddress extends Address = typeof ENERGY_TOKEN_PROGRAM_ADDRESS,
 >(
-  input: InitializeInput<
-    TAccountPayer,
-    TAccountGridtokenxapp,
-    TAccountSystemProgram
-  >,
+  input: InitializeInput<TAccountAuthority>,
   config?: { programAddress?: TProgramAddress }
-): InitializeInstruction<
-  TProgramAddress,
-  TAccountPayer,
-  TAccountGridtokenxapp,
-  TAccountSystemProgram
-> {
+): InitializeInstruction<TProgramAddress, TAccountAuthority> {
   // Program address.
-  const programAddress =
-    config?.programAddress ?? GRIDTOKENXAPP_PROGRAM_ADDRESS;
+  const programAddress = config?.programAddress ?? ENERGY_TOKEN_PROGRAM_ADDRESS;
 
   // Original accounts.
   const originalAccounts = {
-    payer: { value: input.payer ?? null, isWritable: true },
-    gridtokenxapp: { value: input.gridtokenxapp ?? null, isWritable: true },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    authority: { value: input.authority ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
     ResolvedAccount
   >;
 
-  // Resolve default values.
-  if (!accounts.systemProgram.value) {
-    accounts.systemProgram.value =
-      '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
-  }
-
   const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
-    accounts: [
-      getAccountMeta(accounts.payer),
-      getAccountMeta(accounts.gridtokenxapp),
-      getAccountMeta(accounts.systemProgram),
-    ],
+    accounts: [getAccountMeta(accounts.authority)],
     data: getInitializeInstructionDataEncoder().encode({}),
     programAddress,
-  } as InitializeInstruction<
-    TProgramAddress,
-    TAccountPayer,
-    TAccountGridtokenxapp,
-    TAccountSystemProgram
-  >);
+  } as InitializeInstruction<TProgramAddress, TAccountAuthority>);
 }
 
 export type ParsedInitializeInstruction<
-  TProgram extends string = typeof GRIDTOKENXAPP_PROGRAM_ADDRESS,
+  TProgram extends string = typeof ENERGY_TOKEN_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    payer: TAccountMetas[0];
-    gridtokenxapp: TAccountMetas[1];
-    systemProgram: TAccountMetas[2];
+    authority: TAccountMetas[0];
   };
   data: InitializeInstructionData;
 };
@@ -181,7 +132,7 @@ export function parseInitializeInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
 ): ParsedInitializeInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 3) {
+  if (instruction.accounts.length < 1) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
   }
@@ -193,11 +144,7 @@ export function parseInitializeInstruction<
   };
   return {
     programAddress: instruction.programAddress,
-    accounts: {
-      payer: getNextAccount(),
-      gridtokenxapp: getNextAccount(),
-      systemProgram: getNextAccount(),
-    },
+    accounts: { authority: getNextAccount() },
     data: getInitializeInstructionDataDecoder().decode(instruction.data),
   };
 }

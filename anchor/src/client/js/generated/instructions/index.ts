@@ -6,8 +6,8 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from './close';
-export * from './decrement';
-export * from './increment';
+export * from './addRecValidator';
+export * from './burnTokens';
 export * from './initialize';
-export * from './set';
+export * from './initializeToken';
+export * from './transferTokens';
