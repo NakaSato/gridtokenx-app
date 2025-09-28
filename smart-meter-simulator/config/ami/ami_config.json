@@ -1,0 +1,65 @@
+{
+  "ami_network": {
+    "id": "UTCC_CAMPUS_AMI_001",
+    "name": "UTCC University AMI Network",
+    "protocol": "IEEE 2030.5-2018",
+    "profile": "Smart Energy Profile 2.0",
+    "deployment_date": "2025-09-28T15:59:36Z",
+    "version": "2.0.0"
+  },
+  "api_gateway": {
+    "url": "http://localhost:8080",
+    "endpoints": {
+      "device_capability": "/dcap",
+      "end_device": "/edev",
+      "mirror_usage_point": "/mir",
+      "meter_reading": "/mr",
+      "demand_response": "/dr",
+      "der_program": "/der",
+      "time": "/tm"
+    },
+    "authentication": {
+      "type": "mutual_tls",
+      "tls_version": "1.2",
+      "certificate_validation": true
+    }
+  },
+  "communication": {
+    "polling_interval": 15,
+    "retry_attempts": 3,
+    "retry_delay": 5,
+    "timeout": 30,
+    "keepalive": true,
+    "compression": "gzip"
+  },
+  "data_management": {
+    "buffer_size": 1000,
+    "persistence": true,
+    "data_format": "IEEE2030.5_XML",
+    "quality_codes": {
+      "valid": "0x00",
+      "questionable": "0x02",
+      "estimated": "0x08",
+      "invalid": "0x01"
+    }
+  },
+  "security": {
+    "certificate_path": "certs/meters",
+    "ca_certificate": "certs/ca.pem",
+    "validate_certificates": true,
+    "certificate_renewal_days": 30,
+    "secure_storage": true
+  },
+  "meter_capabilities": {
+    "metering": true,
+    "demand_response": true,
+    "distributed_energy_resources": true,
+    "prepayment": false,
+    "pricing": true,
+    "messaging": true,
+    "billing": true,
+    "load_control": true,
+    "flow_reservation": true,
+    "power_quality": true
+  }
+}

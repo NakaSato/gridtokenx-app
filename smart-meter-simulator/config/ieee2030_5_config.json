@@ -1,0 +1,316 @@
+{
+  "protocol": {
+    "name": "IEEE 2030.5-2018",
+    "version": "2.0",
+    "profile": "Smart Energy Profile 2.0",
+    "compliance_level": "Full"
+  },
+  "connection": {
+    "api_gateway": {
+      "primary_url": "https://api-gateway.gridtokenx.local:8443",
+      "backup_url": "https://api-gateway-backup.gridtokenx.local:8443",
+      "connection_timeout": 30,
+      "request_timeout": 60,
+      "max_retries": 3,
+      "retry_backoff": "exponential"
+    },
+    "tls": {
+      "version": "1.2",
+      "cipher_suites": [
+        "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+        "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+        "TLS_RSA_WITH_AES_256_GCM_SHA384",
+        "TLS_RSA_WITH_AES_128_GCM_SHA256"
+      ],
+      "mutual_authentication": true,
+      "verify_server_certificate": true,
+      "client_certificate_required": true
+    }
+  },
+  "function_sets": {
+    "device_capability": {
+      "enabled": true,
+      "endpoint": "/dcap",
+      "polling_rate": 3600,
+      "cache_duration": 86400
+    },
+    "end_device": {
+      "enabled": true,
+      "endpoint": "/edev",
+      "registration_required": true,
+      "heartbeat_interval": 300
+    },
+    "mirror_usage_point": {
+      "enabled": true,
+      "endpoint": "/mir",
+      "post_rate": 15,
+      "buffer_size": 100,
+      "role_flags": 49,
+      "service_kind": 0
+    },
+    "meter_reading": {
+      "enabled": true,
+      "endpoint": "/mr",
+      "reading_types": [
+        {
+          "type": "energy_consumed",
+          "uom": 72,
+          "power_of_ten_multiplier": 0,
+          "time_period": 900
+        },
+        {
+          "type": "energy_generated",
+          "uom": 72,
+          "power_of_ten_multiplier": 0,
+          "time_period": 900
+        },
+        {
+          "type": "instantaneous_power",
+          "uom": 38,
+          "power_of_ten_multiplier": 0,
+          "time_period": 0
+        },
+        {
+          "type": "voltage",
+          "uom": 29,
+          "power_of_ten_multiplier": -1,
+          "time_period": 0
+        },
+        {
+          "type": "current",
+          "uom": 5,
+          "power_of_ten_multiplier": -1,
+          "time_period": 0
+        },
+        {
+          "type": "power_factor",
+          "uom": 65,
+          "power_of_ten_multiplier": -2,
+          "time_period": 0
+        },
+        {
+          "type": "frequency",
+          "uom": 33,
+          "power_of_ten_multiplier": -1,
+          "time_period": 0
+        }
+      ]
+    },
+    "demand_response": {
+      "enabled": true,
+      "endpoint": "/dr",
+      "polling_rate": 60,
+      "event_types": [
+        "LoadShed",
+        "LoadShift",
+        "CriticalPeakPricing",
+        "RealTimePricing"
+      ],
+      "response_required": true,
+      "opt_out_allowed": true
+    },
+    "der_program": {
+      "enabled": true,
+      "endpoint": "/der",
+      "polling_rate": 300,
+      "capabilities": {
+        "solar_generation": true,
+        "battery_storage": true,
+        "grid_export": true,
+        "reactive_power": true,
+        "voltage_regulation": true
+      }
+    },
+    "pricing": {
+      "enabled": true,
+      "endpoint": "/pri",
+      "polling_rate": 900,
+      "tariff_types": [
+        "time_of_use",
+        "real_time",
+        "critical_peak",
+        "flat_rate"
+      ]
+    },
+    "messaging": {
+      "enabled": true,
+      "endpoint": "/msg",
+      "polling_rate": 300,
+      "priority_levels": [
+        "emergency",
+        "high",
+        "normal",
+        "low"
+      ]
+    },
+    "time": {
+      "enabled": true,
+      "endpoint": "/tm",
+      "sync_interval": 3600,
+      "max_drift": 5,
+      "ntp_backup": true
+    },
+    "flow_reservation": {
+      "enabled": true,
+      "endpoint": "/rsv",
+      "p2p_trading": true,
+      "max_reservations": 10,
+      "reservation_duration": 3600
+    },
+    "prepayment": {
+      "enabled": false,
+      "endpoint": "/ppy"
+    },
+    "billing": {
+      "enabled": true,
+      "endpoint": "/bil",
+      "reading_interval": 900,
+      "billing_period": "monthly"
+    }
+  },
+  "data_format": {
+    "content_type": "application/sep+xml",
+    "encoding": "UTF-8",
+    "compression": "gzip",
+    "xml_namespace": "urn:ieee:std:2030.5:ns",
+    "schema_version": "2.0"
+  },
+  "quality_codes": {
+    "VALID": 0,
+    "INVALID": 1,
+    "QUESTIONABLE": 2,
+    "DERIVED": 4,
+    "ESTIMATED": 8,
+    "USER_DEFINED": 16
+  },
+  "device_categories": {
+    "SMART_METER": 1281,
+    "SOLAR_INVERTER": 1282,
+    "BATTERY_STORAGE": 1283,
+    "EV_CHARGER": 1284,
+    "LOAD_CONTROLLER": 1285,
+    "GATEWAY": 1286,
+    "AGGREGATOR": 1287
+  },
+  "units_of_measure": {
+    "NOT_APPLICABLE": 0,
+    "AMPERE": 5,
+    "KELVIN": 6,
+    "DEGREE_CELSIUS": 23,
+    "VOLT": 29,
+    "JOULE": 31,
+    "HERTZ": 33,
+    "WATT": 38,
+    "CUBIC_METER": 42,
+    "VOLT_AMPERE": 61,
+    "VOLT_AMPERE_REACTIVE": 63,
+    "DEGREE_PHASE": 65,
+    "POWER_FACTOR": 65,
+    "VOLT_SQUARED_HOUR": 67,
+    "AMPERE_SQUARED_HOUR": 68,
+    "WATT_HOUR": 72,
+    "VOLT_AMPERE_HOUR": 73,
+    "VAR_HOUR": 71
+  },
+  "power_of_ten_multipliers": {
+    "NANO": -9,
+    "MICRO": -6,
+    "MILLI": -3,
+    "CENTI": -2,
+    "DECI": -1,
+    "NONE": 0,
+    "DEKA": 1,
+    "HECTO": 2,
+    "KILO": 3,
+    "MEGA": 6,
+    "GIGA": 9,
+    "TERA": 12
+  },
+  "role_flags": {
+    "IS_MIRROR": 1,
+    "IS_AGGREGATOR": 2,
+    "IS_SUBMETER": 4,
+    "IS_PEV": 8,
+    "IS_DER": 16,
+    "IS_REVENUE_QUALITY": 32,
+    "IS_DC_MEASUREMENT": 64,
+    "IS_PREMISES_AGGREGATION": 128
+  },
+  "service_kinds": {
+    "ELECTRICITY": 0,
+    "GAS": 1,
+    "WATER": 2,
+    "TIME": 3,
+    "PRESSURE": 4,
+    "HEAT": 5,
+    "COOLING": 6
+  },
+  "response_codes": {
+    "SUCCESS": 200,
+    "CREATED": 201,
+    "ACCEPTED": 202,
+    "NO_CONTENT": 204,
+    "PARTIAL_CONTENT": 206,
+    "MOVED_PERMANENTLY": 301,
+    "NOT_MODIFIED": 304,
+    "BAD_REQUEST": 400,
+    "UNAUTHORIZED": 401,
+    "FORBIDDEN": 403,
+    "NOT_FOUND": 404,
+    "METHOD_NOT_ALLOWED": 405,
+    "NOT_ACCEPTABLE": 406,
+    "CONFLICT": 409,
+    "PRECONDITION_FAILED": 412,
+    "REQUEST_ENTITY_TOO_LARGE": 413,
+    "INTERNAL_SERVER_ERROR": 500,
+    "NOT_IMPLEMENTED": 501,
+    "SERVICE_UNAVAILABLE": 503
+  },
+  "event_status": {
+    "SCHEDULED": 0,
+    "ACTIVE": 1,
+    "CANCELLED": 2,
+    "CANCELLED_WITH_RANDOMIZATION": 3,
+    "SUPERSEDED": 4,
+    "COMPLETED": 5
+  },
+  "polling_intervals": {
+    "default": 900,
+    "minimum": 15,
+    "maximum": 86400,
+    "device_capability": 86400,
+    "time_sync": 3600,
+    "meter_reading": 15,
+    "demand_response": 60,
+    "der_control": 300,
+    "pricing": 900,
+    "messaging": 300,
+    "flow_reservation": 60
+  },
+  "buffer_settings": {
+    "meter_readings": {
+      "size": 1000,
+      "overflow_policy": "fifo",
+      "persistence": true
+    },
+    "events": {
+      "size": 100,
+      "overflow_policy": "priority",
+      "persistence": true
+    },
+    "messages": {
+      "size": 50,
+      "overflow_policy": "fifo",
+      "persistence": false
+    }
+  },
+  "compliance": {
+    "specification": "IEEE 2030.5-2018",
+    "profile": "Smart Energy Profile 2.0",
+    "certification_level": "Certified",
+    "test_suite_version": "1.2.0",
+    "interoperability_tested": true,
+    "csip_compliant": true,
+    "ca_certified": true
+  }
+}

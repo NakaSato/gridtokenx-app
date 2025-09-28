@@ -55,8 +55,8 @@ async fn main() -> Result<()> {
     info!("TimescaleDB connection established");
 
     // Run database migrations (PostgreSQL only - TimescaleDB has its own schema)
-    database::run_migrations(&db_pool).await?;
-    info!("Database migrations completed successfully");
+    // database::run_migrations(&db_pool).await?;
+    info!("Database migrations skipped (tables already exist)");
 
     // Setup Redis connection
     let redis_client = redis::Client::open(config.redis_url.as_str())?;

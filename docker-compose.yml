@@ -38,7 +38,7 @@ services:
       dockerfile: Dockerfile
     container_name: p2p-anchor-dev
     ports:
-      - "8898:8899"  # JSON RPC (avoiding conflict with Anchor tests)
+      - "8898:8899"  # JSON RPC
       - "8901:8900"  # WebSocket
       - "8001:8001"  # Gossip
     volumes:
@@ -130,22 +130,6 @@ services:
     volumes:
       - zookeeper_data:/var/lib/zookeeper/data
       - zookeeper_logs:/var/lib/zookeeper/log
-    networks:
-      - p2p-network
-    restart: unless-stopped
-
-  # Oracle Simulator
-  oracle-simulator:
-    build:
-      context: ./docker/oracle-simulator
-    container_name: p2p-oracle-simulator
-    depends_on:
-      - solana-validator
-      - postgres
-    environment:
-      SOLANA_RPC_URL: "http://solana-validator:8899"
-      DATABASE_URL: "postgresql://p2p_user:p2p_password@postgres:5432/p2p_energy_trading"
-      ORACLE_INTERVAL: "30"  # seconds
     networks:
       - p2p-network
     restart: unless-stopped

@@ -5,7 +5,7 @@ pub struct TransactionSubmission {
     pub transaction: String, // base64 encoded transaction
     pub program_id: String,
     pub priority_fee: rust_decimal::Decimal,
-    pub compute_units: u32,
+    pub compute_units: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

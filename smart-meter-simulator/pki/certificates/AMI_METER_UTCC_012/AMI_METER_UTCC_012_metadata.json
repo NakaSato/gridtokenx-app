@@ -1,0 +1,11 @@
+{
+  "device_id": "AMI_METER_UTCC_012",
+  "building": "Library Building",
+  "serial_number": "CERT_20250928_012",
+  "issued_date": "2025-09-28T16:15:55.866520+00:00",
+  "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+  "status": "active",
+  "template": "smart_meter",
+  "key_size": 2048,
+  "algorithm": "RSA-SHA256"
+}

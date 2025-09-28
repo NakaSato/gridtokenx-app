@@ -1,0 +1,282 @@
+{
+  "campus_name": "UTCC University",
+  "generation_date": "2025-09-28T16:15:55.866520+00:00",
+  "total_certificates": 25,
+  "certificates": [
+    {
+      "device_id": "AMI_METER_UTCC_001",
+      "building": "Engineering Building A",
+      "serial_number": "CERT_20250928_001",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_002",
+      "building": "Engineering Building A",
+      "serial_number": "CERT_20250928_002",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_003",
+      "building": "Engineering Building A",
+      "serial_number": "CERT_20250928_003",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_004",
+      "building": "Engineering Building B",
+      "serial_number": "CERT_20250928_004",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_005",
+      "building": "Engineering Building B",
+      "serial_number": "CERT_20250928_005",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_006",
+      "building": "Business Administration Building",
+      "serial_number": "CERT_20250928_006",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_007",
+      "building": "Business Administration Building",
+      "serial_number": "CERT_20250928_007",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_008",
+      "building": "Business Administration Building",
+      "serial_number": "CERT_20250928_008",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_009",
+      "building": "Science Building",
+      "serial_number": "CERT_20250928_009",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_010",
+      "building": "Science Building",
+      "serial_number": "CERT_20250928_010",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_011",
+      "building": "Library Building",
+      "serial_number": "CERT_20250928_011",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_012",
+      "building": "Library Building",
+      "serial_number": "CERT_20250928_012",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_013",
+      "building": "Student Center",
+      "serial_number": "CERT_20250928_013",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_014",
+      "building": "Student Center",
+      "serial_number": "CERT_20250928_014",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_015",
+      "building": "Administration Building",
+      "serial_number": "CERT_20250928_015",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_016",
+      "building": "Administration Building",
+      "serial_number": "CERT_20250928_016",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_017",
+      "building": "Dormitory A",
+      "serial_number": "CERT_20250928_017",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_018",
+      "building": "Dormitory A",
+      "serial_number": "CERT_20250928_018",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_019",
+      "building": "Dormitory B",
+      "serial_number": "CERT_20250928_019",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_020",
+      "building": "Dormitory B",
+      "serial_number": "CERT_20250928_020",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_021",
+      "building": "Cafeteria",
+      "serial_number": "CERT_20250928_021",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_022",
+      "building": "Gymnasium",
+      "serial_number": "CERT_20250928_022",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_023",
+      "building": "Parking Structure",
+      "serial_number": "CERT_20250928_023",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_024",
+      "building": "Maintenance Building",
+      "serial_number": "CERT_20250928_024",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    },
+    {
+      "device_id": "AMI_METER_UTCC_025",
+      "building": "Research Center",
+      "serial_number": "CERT_20250928_025",
+      "issued_date": "2025-09-28T16:15:55.866520+00:00",
+      "expiry_date": "2026-09-28T16:15:55.866520+00:00",
+      "status": "active",
+      "template": "smart_meter",
+      "key_size": 2048,
+      "algorithm": "RSA-SHA256"
+    }
+  ]
+}
