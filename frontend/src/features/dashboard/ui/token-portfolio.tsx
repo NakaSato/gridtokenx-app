@@ -247,98 +247,99 @@ export function TokenPortfolio({ className }: TokenPortfolioProps) {
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4 mt-4">
-
-      {isLoading ? (
-        <div className="space-y-4">
-          {/* Portfolio Summary Skeleton */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="h-6 bg-muted rounded animate-pulse" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <div className="h-4 bg-muted rounded animate-pulse w-20" />
-                  <div className="h-8 bg-muted rounded animate-pulse w-32" />
-                </div>
-                <div className="flex justify-between">
-                  <div className="h-4 bg-muted rounded animate-pulse w-16" />
-                  <div className="h-4 bg-muted rounded animate-pulse w-20" />
-                </div>
-                <div className="flex justify-between">
-                  <div className="h-4 bg-muted rounded animate-pulse w-12" />
-                  <div className="h-4 bg-muted rounded animate-pulse w-8" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Token Balance Cards Skeleton */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-10 w-10 bg-muted rounded-full animate-pulse" />
-                      <div className="space-y-1">
-                        <div className="h-4 bg-muted rounded animate-pulse w-24" />
-                        <div className="h-3 bg-muted rounded animate-pulse w-16" />
-                      </div>
+          {isLoading ? (
+            <div className="space-y-4">
+              {/* Portfolio Summary Skeleton */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="h-6 bg-muted rounded animate-pulse" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="h-4 bg-muted rounded animate-pulse w-20" />
+                      <div className="h-8 bg-muted rounded animate-pulse w-32" />
                     </div>
-                    <div className="h-5 bg-muted rounded animate-pulse w-16" />
-                  </div>
-                  <div className="space-y-2">
-                    {Array.from({ length: 3 }).map((_, j) => (
-                      <div key={j} className="flex justify-between">
-                        <div className="h-4 bg-muted rounded animate-pulse w-16" />
-                        <div className="h-4 bg-muted rounded animate-pulse w-20" />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 pt-3 border-t">
                     <div className="flex justify-between">
-                      <div className="h-3 bg-muted rounded animate-pulse flex-1 mr-2" />
-                      <div className="flex space-x-1">
-                        <div className="h-6 w-6 bg-muted rounded animate-pulse" />
-                        <div className="h-6 w-6 bg-muted rounded animate-pulse" />
-                      </div>
+                      <div className="h-4 bg-muted rounded animate-pulse w-16" />
+                      <div className="h-4 bg-muted rounded animate-pulse w-20" />
+                    </div>
+                    <div className="flex justify-between">
+                      <div className="h-4 bg-muted rounded animate-pulse w-12" />
+                      <div className="h-4 bg-muted rounded animate-pulse w-8" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        </div>
-      ) : portfolioData ? (
-        <div className="space-y-4">
-          <PortfolioSummary
-            totalValue={portfolioData.totalValue}
-            totalChange24h={portfolioData.totalChange24h}
-            balanceCount={portfolioData.balances.length}
-          />
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {portfolioData.balances.map((balance) => (
-              <TokenBalanceCard
-                key={balance.contractAddress}
-                balance={balance}
-                onCopyAddress={handleCopyAddress}
-                onViewContract={handleViewContract}
-                onViewDetails={handleViewDetails}
-              />
-            ))}
-          </div>
-
-          {copiedAddress && (
-            <div className="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-md shadow-lg">
-              Address copied to clipboard!
+              {/* Token Balance Cards Skeleton */}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Card key={i}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="h-10 w-10 bg-muted rounded-full animate-pulse" />
+                          <div className="space-y-1">
+                            <div className="h-4 bg-muted rounded animate-pulse w-24" />
+                            <div className="h-3 bg-muted rounded animate-pulse w-16" />
+                          </div>
+                        </div>
+                        <div className="h-5 bg-muted rounded animate-pulse w-16" />
+                      </div>
+                      <div className="space-y-2">
+                        {Array.from({ length: 3 }).map((_, j) => (
+                          <div key={j} className="flex justify-between">
+                            <div className="h-4 bg-muted rounded animate-pulse w-16" />
+                            <div className="h-4 bg-muted rounded animate-pulse w-20" />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 pt-3 border-t">
+                        <div className="flex justify-between">
+                          <div className="h-3 bg-muted rounded animate-pulse flex-1 mr-2" />
+                          <div className="flex space-x-1">
+                            <div className="h-6 w-6 bg-muted rounded animate-pulse" />
+                            <div className="h-6 w-6 bg-muted rounded animate-pulse" />
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
-          )}
+          ) : portfolioData ? (
+            <div className="space-y-4">
+              <PortfolioSummary
+                totalValue={portfolioData.totalValue}
+                totalChange24h={portfolioData.totalChange24h}
+                balanceCount={portfolioData.balances.length}
+              />
 
-          <div className="text-center text-xs text-muted-foreground">
-            Last updated: {new Date(portfolioData.lastUpdated).toLocaleString()}
-          </div>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {portfolioData.balances.map((balance) => (
+                  <TokenBalanceCard
+                    key={balance.contractAddress}
+                    balance={balance}
+                    onCopyAddress={handleCopyAddress}
+                    onViewContract={handleViewContract}
+                    onViewDetails={handleViewDetails}
+                  />
+                ))}
+              </div>
+
+              {copiedAddress && (
+                <div className="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-md shadow-lg">
+                  Address copied to clipboard!
+                </div>
+              )}
+
+              <div className="text-center text-xs text-muted-foreground">
+                Last updated: {new Date(portfolioData.lastUpdated).toLocaleString()}
+              </div>
+            </div>
+          ) : null}
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4 mt-4">
@@ -350,8 +351,6 @@ export function TokenPortfolio({ className }: TokenPortfolioProps) {
             />
           )}
         </TabsContent>
-        </div>
-      ) : null}
       </Tabs>
 
       {/* Token Details Modal */}

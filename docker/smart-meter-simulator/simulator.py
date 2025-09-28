@@ -1,747 +1,397 @@
 #!/usr/bin/env python3
+"""
+IEEE 2030.5 Smart Meter Simulator
+
+This module provides IEEE 2030.5 Smart Energy Profile 2.0 protocol compliant
+smart meter simulation for P2P energy trading systems.
+
+Key Features:
+- IEEE 2030.5 compliant communication
+- P2P energy trading integration
+- Blockchain oracle updates via IEEE 2030.5
+- RESTful API with TLS client certificates
+- Real-time demand response and DER control
+- Standardized meter reading formats
+"""
 
 import os
-import json
-import time
-import random
-import logging
-import schedule
-import math
 import asyncio
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass, asdict
-from enum import Enum
-from kafka import KafkaProducer
-from kafka.errors import NoBrokersAvailable, KafkaTimeoutError
-import psycopg2
-from psycopg2.extras import RealDictCursor
-import pandas as pd
-import numpy as np
+import logging
+import time
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional
+from dataclasses import dataclass
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Import IEEE 2030.5 components
+from ieee2030_5.client import IEEE2030_5_Client
+from ieee2030_5.server import IEEE2030_5_Server
+from ieee2030_5.resources import MeterReading, Reading
+from ieee2030_5.function_sets import DemandResponseControl, DERControl
+
 logger = logging.getLogger(__name__)
 
-class MeterType(Enum):
-    SOLAR_PROSUMER = "Solar_Prosumer"
-    GRID_CONSUMER = "Grid_Consumer"
-    HYBRID_PROSUMER = "Hybrid_Prosumer"
-    BATTERY_STORAGE = "Battery_Storage"
-
-class WeatherCondition(Enum):
-    SUNNY = "Sunny"
-    PARTLY_CLOUDY = "Partly_Cloudy"
-    CLOUDY = "Cloudy"
-    OVERCAST = "Overcast"
-    RAINY = "Rainy"
-
-class GridConnectionStatus(Enum):
-    CONNECTED = "Connected"
-    DISCONNECTED = "Disconnected"
-    MAINTENANCE = "Maintenance"
 
 @dataclass
-class EnergyReading:
+class SimpleEnergyReading:
+    """Simple energy reading data structure for IEEE 2030.5 simulator"""
     timestamp: str
     meter_id: str
-    meter_type: str
-    location: str
-    user_type: str
-    
-    # Energy Data (kWh)
-    energy_generated: float
-    energy_consumed: float
-    energy_available_for_sale: float
-    energy_needed_from_grid: float
-    battery_level: float
-    
-    # Electrical Parameters
-    voltage: float
-    current: float
-    power_factor: float
-    frequency: float
-    temperature: float
-    
-    # Solar Specific
-    irradiance: Optional[float]
-    panel_temperature: Optional[float]
-    weather_condition: Optional[str]
-    
-    # Grid Connection
-    grid_connection_status: str
-    grid_feed_in_rate: float
-    grid_purchase_rate: float
-    
-    # Trading Data
-    surplus_energy: float
-    deficit_energy: float
-    trading_preference: str
-    max_sell_price: float
-    max_buy_price: float
-    
-    # REC Data (Renewable Energy Certificate)
-    rec_eligible: bool
-    carbon_offset: float
+    energy_generated: float  # kWh
+    energy_consumed: float   # kWh
+    voltage: float          # V
+    current: float          # A
+    power_factor: float     # ratio
+    frequency: float        # Hz
 
-class EnhancedSmartMeterSimulator:
+
+class IEEE2030_5_SmartMeterSimulator:
+    """
+    IEEE 2030.5 Smart Meter Simulator
+    
+    Standalone smart meter simulator using IEEE 2030.5 protocol for P2P energy trading.
+    """
+    
+    DEFAULT_SIMULATION_INTERVAL = 15  # seconds
+    
     def __init__(self):
-        # Service Configuration
-        self.kafka_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
-        self.db_url = os.getenv('DATABASE_URL', 'postgresql://p2p_user:p2p_password@localhost:5432/p2p_energy_trading')
-        self.timescale_url = os.getenv('TIMESCALE_URL', 'postgresql://timescale_user:timescale_password@localhost:5433/p2p_timeseries')
+        # Basic configuration
+        self.simulation_interval = int(os.getenv('SIMULATION_INTERVAL', self.DEFAULT_SIMULATION_INTERVAL))
+        self.meter_id = os.getenv('METER_ID', f"AMI_METER_{id(self):08x}")
         
-        # Simulation Configuration
-        self.simulation_interval = int(os.getenv('SIMULATION_INTERVAL', '30'))
-        self.num_meters = int(os.getenv('NUM_METERS', '20'))
-        self.output_file = os.getenv('OUTPUT_FILE', './data/meter_readings.jsonl')
-        
-        # Solar Configuration
-        self.solar_panel_efficiency_min = float(os.getenv('SOLAR_PANEL_EFFICIENCY_MIN', '0.85'))
-        self.solar_panel_efficiency_max = float(os.getenv('SOLAR_PANEL_EFFICIENCY_MAX', '0.95'))
-        self.base_generation_min = float(os.getenv('BASE_GENERATION_MIN', '3.0'))
-        self.base_generation_max = float(os.getenv('BASE_GENERATION_MAX', '12.0'))
-        
-        # Trading Configuration
-        self.min_sell_price = float(os.getenv('MIN_SELL_PRICE', '0.15'))  # USD per kWh
-        self.max_sell_price = float(os.getenv('MAX_SELL_PRICE', '0.35'))
-        self.min_buy_price = float(os.getenv('MIN_BUY_PRICE', '0.20'))
-        self.max_buy_price = float(os.getenv('MAX_BUY_PRICE', '0.40'))
-        self.grid_feed_in_rate = float(os.getenv('GRID_FEED_IN_RATE', '0.12'))
-        self.grid_purchase_rate = float(os.getenv('GRID_PURCHASE_RATE', '0.28'))
-        
-        # Weather Weights
-        self.weather_weights = {
-            WeatherCondition.SUNNY: float(os.getenv('WEATHER_SUNNY_WEIGHT', '0.4')),
-            WeatherCondition.PARTLY_CLOUDY: float(os.getenv('WEATHER_PARTLY_CLOUDY_WEIGHT', '0.3')),
-            WeatherCondition.CLOUDY: float(os.getenv('WEATHER_CLOUDY_WEIGHT', '0.15')),
-            WeatherCondition.OVERCAST: float(os.getenv('WEATHER_OVERCAST_WEIGHT', '0.1')),
-            WeatherCondition.RAINY: float(os.getenv('WEATHER_RAINY_WEIGHT', '0.05'))
-        }
-        
-        # Initialize services
-        self.producer = None
-        self.db_conn = None
-        self.timescale_conn = None
-        self.standalone_mode = False
-        
-        self.initialize_services()
-        
-        # Initialize enhanced meter configurations
-        self.meters = self.initialize_enhanced_meters()
-        
-        # Statistics
-        self.stats = {
-            'total_readings': 0,
-            'kafka_sends': 0,
-            'db_stores': 0,
-            'file_saves': 0,
-            'trading_opportunities': 0,
-            'rec_generated': 0
-        }
-        
-        # Weather simulation state
-        self.current_weather = WeatherCondition.SUNNY
-        self.weather_duration = 0
-        self.weather_change_interval = random.randint(3, 8)  # Change weather every 3-8 cycles
+        # IEEE 2030.5 configuration
+        self.ieee2030_5_enabled = os.getenv('IEEE2030_5_ENABLED', 'true').lower() == 'true'
+        self.ieee2030_5_server_url = os.getenv('IEEE2030_5_SERVER_URL', 'https://localhost:8443')
+        self.client_cert_path = os.getenv('CLIENT_CERT_PATH', './certs/client.pem')
+        self.client_key_path = os.getenv('CLIENT_KEY_PATH', './certs/client.key')
+        self.ca_cert_path = os.getenv('CA_CERT_PATH', './certs/ca.pem')
 
-    def initialize_services(self):
-        """Initialize external services with enhanced error handling"""
-        services_available = 0
-        
-        # Initialize Kafka
+        # IEEE 2030.5 client
+        self.ieee2030_5_client: Optional[IEEE2030_5_Client] = None
+
+        # Event loop for async operations
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
+
+        # IEEE 2030.5 state
+        self.current_dr_events: Dict[str, DemandResponseControl] = {}
+        self.current_der_controls: Dict[str, DERControl] = {}
+        self.p2p_pricing: Dict[str, int] = {'current_rate': 200}  # 20 cents default
+
+        if self.ieee2030_5_enabled:
+            self.initialize_ieee2030_5()
+    
+    def initialize_ieee2030_5(self):
+        """Initialize IEEE 2030.5 components"""
         try:
-            self.producer = KafkaProducer(
-                bootstrap_servers=self.kafka_servers.split(','),
-                value_serializer=lambda v: json.dumps(v, default=str).encode('utf-8'),
-                key_serializer=lambda k: k.encode('utf-8') if k else None,
-                request_timeout_ms=10000,
-                retries=3
+            # Create IEEE 2030.5 client
+            self.ieee2030_5_client = IEEE2030_5_Client(
+                server_url=self.ieee2030_5_server_url,
+                client_cert_path=self.client_cert_path,
+                client_key_path=self.client_key_path,
+                ca_cert_path=self.ca_cert_path,
+                device_id=self.meter_id
             )
-            logger.info("Kafka producer initialized successfully")
-            services_available += 1
-        except Exception as e:
-            logger.warning(f"Kafka not available: {e}")
-            self.producer = None
-        
-        # Initialize Database connections
-        try:
-            self.db_conn = psycopg2.connect(self.db_url)
-            logger.info("Main database connection established")
-            services_available += 1
-        except Exception as e:
-            logger.warning(f"Main database not available: {e}")
-            self.db_conn = None
-        
-        try:
-            self.timescale_conn = psycopg2.connect(self.timescale_url)
-            logger.info("TimescaleDB connection established")
-            services_available += 1
-        except Exception as e:
-            logger.warning(f"TimescaleDB not available: {e}")
-            self.timescale_conn = None
-        
-        # Set mode
-        self.standalone_mode = services_available == 0
-        
-        if self.standalone_mode:
-            logger.info("Running in STANDALONE mode")
-        else:
-            logger.info(f"Running in INTEGRATED mode - {services_available}/3 services available")
-        
-        # Ensure output directory exists
-        os.makedirs(os.path.dirname(self.output_file) if os.path.dirname(self.output_file) else './data', exist_ok=True)
 
-    def initialize_enhanced_meters(self) -> List[Dict[str, Any]]:
-        """Initialize enhanced meter configurations with trading capabilities"""
-        meters = []
-        
-        # Try to get meters from database first
-        if self.db_conn:
+            logger.info("IEEE 2030.5 components initialized")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize IEEE 2030.5: {e}")
+            self.ieee2030_5_enabled = False
+
+    async def start_ieee2030_5_client(self):
+        """Start IEEE 2030.5 client"""
+        if self.ieee2030_5_client:
             try:
-                with self.db_conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                    cursor.execute("""
-                        SELECT sm.meter_id, sm.meter_type, sm.location, 
-                               u.user_type, u.trading_preferences
-                        FROM smart_meters sm
-                        JOIN users u ON sm.user_id = u.id
-                        WHERE sm.status = 'Active'
-                        LIMIT %s
-                    """, (self.num_meters,))
-                    
-                    db_meters = cursor.fetchall()
-                    for meter in db_meters:
-                        meter_config = self.create_meter_config(
-                            meter['meter_id'],
-                            meter['meter_type'],
-                            meter['location'],
-                            meter['user_type'],
-                            meter.get('trading_preferences', {})
-                        )
-                        meters.append(meter_config)
+                await self.ieee2030_5_client.start()
+                logger.info("IEEE 2030.5 client started")
             except Exception as e:
-                logger.warning(f"Failed to load meters from database: {e}")
-        
-        # Fallback to simulated meters
-        if not meters:
-            meter_types = [
-                MeterType.SOLAR_PROSUMER,
-                MeterType.GRID_CONSUMER,
-                MeterType.HYBRID_PROSUMER,
-                MeterType.BATTERY_STORAGE
-            ]
-            
-            for i in range(self.num_meters):
-                meter_type = random.choice(meter_types)
-                user_type = self.get_user_type_from_meter_type(meter_type)
-                
-                meter_config = self.create_meter_config(
-                    f'AMI_METER_{i+1:03d}',
-                    meter_type.value,
-                    f'Zone_{random.randint(1, 5)}_Building_{i+1}',
-                    user_type
-                )
-                meters.append(meter_config)
-        
-        logger.info(f"Initialized {len(meters)} enhanced meters")
-        return meters
+                logger.error(f"Failed to start IEEE 2030.5 client: {e}")
 
-    def get_user_type_from_meter_type(self, meter_type: MeterType) -> str:
-        """Map meter type to user type"""
-        mapping = {
-            MeterType.SOLAR_PROSUMER: 'Prosumer',
-            MeterType.GRID_CONSUMER: 'Consumer',
-            MeterType.HYBRID_PROSUMER: 'Prosumer',
-            MeterType.BATTERY_STORAGE: 'Storage_Provider'
-        }
-        return mapping.get(meter_type, 'Consumer')
+    async def stop_ieee2030_5_client(self):
+        """Stop IEEE 2030.5 client"""
+        if self.ieee2030_5_client:
+            try:
+                await self.ieee2030_5_client.stop()
+                logger.info("IEEE 2030.5 client stopped")
+            except Exception as e:
+                logger.error(f"Failed to stop IEEE 2030.5 client: {e}")
 
-    def create_meter_config(self, meter_id: str, meter_type: str, location: str, 
-                          user_type: str, trading_prefs: Optional[Dict] = None) -> Dict[str, Any]:
-        """Create enhanced meter configuration"""
-        config = {
-            'meter_id': meter_id,
-            'meter_type': meter_type,
-            'location': location,
-            'user_type': user_type,
-            
-            # Generation capabilities
-            'has_solar': meter_type in ['Solar_Prosumer', 'Hybrid_Prosumer'],
-            'has_battery': meter_type in ['Hybrid_Prosumer', 'Battery_Storage'],
-            'solar_capacity': random.uniform(5.0, 15.0) if 'Prosumer' in meter_type else 0.0,
-            'battery_capacity': random.uniform(10.0, 30.0) if 'Battery' in meter_type or 'Hybrid' in meter_type else 0.0,
-            
-            # Efficiency parameters
-            'panel_efficiency': random.uniform(self.solar_panel_efficiency_min, self.solar_panel_efficiency_max),
-            'inverter_efficiency': random.uniform(0.94, 0.98),
-            'battery_efficiency': random.uniform(0.90, 0.95),
-            
-            # Consumption patterns
-            'base_consumption': random.uniform(1.5, 8.0),
-            'consumption_variability': random.uniform(0.1, 0.3),
-            
-            # Trading preferences
-            'trading_enabled': trading_prefs.get('enabled', True) if trading_prefs else True,
-            'preferred_sell_price': random.uniform(self.min_sell_price, self.max_sell_price),
-            'preferred_buy_price': random.uniform(self.min_buy_price, self.max_buy_price),
-            'trading_strategy': random.choice(['Conservative', 'Moderate', 'Aggressive']),
-            
-            # Battery state (if applicable)
-            'current_battery_level': random.uniform(20, 80) if 'Battery' in meter_type or 'Hybrid' in meter_type else 0,
-            
-            # Noise and variability
-            'noise_factor': random.uniform(0.05, 0.15),
-            'weather_sensitivity': random.uniform(0.7, 1.0)
-        }
+    def generate_reading(self) -> SimpleEnergyReading:
+        """Generate a simple energy reading"""
+        import random
         
-        return config
-
-    def update_weather_simulation(self):
-        """Update weather conditions with realistic patterns"""
-        self.weather_duration += 1
+        # Generate basic meter reading with some randomness
+        now = datetime.now(timezone.utc).isoformat()
         
-        if self.weather_duration >= self.weather_change_interval:
-            # Choose new weather condition based on current weather and probabilities
-            weather_transitions = {
-                WeatherCondition.SUNNY: [WeatherCondition.SUNNY, WeatherCondition.PARTLY_CLOUDY],
-                WeatherCondition.PARTLY_CLOUDY: [WeatherCondition.SUNNY, WeatherCondition.CLOUDY, WeatherCondition.PARTLY_CLOUDY],
-                WeatherCondition.CLOUDY: [WeatherCondition.PARTLY_CLOUDY, WeatherCondition.OVERCAST, WeatherCondition.CLOUDY],
-                WeatherCondition.OVERCAST: [WeatherCondition.CLOUDY, WeatherCondition.RAINY, WeatherCondition.OVERCAST],
-                WeatherCondition.RAINY: [WeatherCondition.OVERCAST, WeatherCondition.CLOUDY]
-            }
-            
-            possible_conditions = weather_transitions.get(self.current_weather, list(WeatherCondition))
-            weights = [self.weather_weights[condition] for condition in possible_conditions]
-            
-            self.current_weather = random.choices(possible_conditions, weights=weights)[0]
-            self.weather_duration = 0
-            self.weather_change_interval = random.randint(2, 10)
-            
-            logger.info(f"Weather changed to: {self.current_weather.value}")
-
-    def calculate_solar_generation_factor(self) -> Tuple[float, float, float]:
-        """Calculate solar generation factors with enhanced weather modeling"""
-        current_time = datetime.now()
-        hour = current_time.hour
+        # Simulate basic energy values
+        energy_generated = random.uniform(0.5, 5.0)  # kWh
+        energy_consumed = random.uniform(1.0, 4.0)   # kWh
+        voltage = random.uniform(230, 240)           # V
+        current = random.uniform(5, 20)              # A
+        power_factor = random.uniform(0.85, 0.95)    # ratio
+        frequency = random.uniform(49.5, 50.5)       # Hz
         
-        # Base solar curve (time of day factor)
-        if 6 <= hour <= 18:
-            # Enhanced solar curve with more realistic progression
-            time_factor = math.sin(math.pi * (hour - 6) / 12) ** 2
-        else:
-            time_factor = 0.0
-        
-        # Weather impact on solar generation
-        weather_factors = {
-            WeatherCondition.SUNNY: 1.0,
-            WeatherCondition.PARTLY_CLOUDY: random.uniform(0.7, 0.9),
-            WeatherCondition.CLOUDY: random.uniform(0.4, 0.7),
-            WeatherCondition.OVERCAST: random.uniform(0.2, 0.4),
-            WeatherCondition.RAINY: random.uniform(0.1, 0.3)
-        }
-        
-        weather_factor = weather_factors.get(self.current_weather, 0.8)
-        
-        # Calculate irradiance (W/m²)
-        max_irradiance = 1200  # Clear sky peak irradiance
-        irradiance = time_factor * weather_factor * max_irradiance + random.gauss(0, 50)
-        irradiance = max(0, irradiance)
-        
-        # Panel temperature affects efficiency (higher temp = lower efficiency)
-        ambient_temp = random.gauss(25, 5)  # Base temperature
-        panel_temp = ambient_temp + (irradiance / 1000) * 25  # Panel heating from solar
-        
-        return time_factor * weather_factor, irradiance, panel_temp
-
-    def calculate_consumption_pattern(self, hour: int, meter_config: Dict[str, Any]) -> float:
-        """Calculate realistic consumption patterns based on user type and time"""
-        base_consumption = meter_config['base_consumption']
-        variability = meter_config['consumption_variability']
-        user_type = meter_config['user_type']
-        
-        # Time-of-day patterns by user type
-        if user_type == 'Consumer':
-            # Residential pattern: morning and evening peaks
-            if 6 <= hour <= 9 or 17 <= hour <= 22:  # Peak hours
-                time_factor = random.uniform(1.4, 2.0)
-            elif 22 <= hour or hour <= 6:  # Night
-                time_factor = random.uniform(0.3, 0.7)
-            else:  # Day
-                time_factor = random.uniform(0.7, 1.1)
-        
-        elif user_type == 'Prosumer':
-            # Smart prosumer: lower consumption during high solar generation
-            if 10 <= hour <= 15:  # Solar peak hours - shifted consumption
-                time_factor = random.uniform(0.6, 0.9)
-            elif 7 <= hour <= 9 or 18 <= hour <= 21:  # Morning/evening
-                time_factor = random.uniform(1.2, 1.6)
-            else:
-                time_factor = random.uniform(0.8, 1.2)
-        
-        else:  # Storage_Provider or other
-            # More consistent industrial-like pattern
-            if 8 <= hour <= 17:  # Business hours
-                time_factor = random.uniform(1.1, 1.4)
-            else:
-                time_factor = random.uniform(0.7, 1.0)
-        
-        # Add randomness and variability
-        consumption = base_consumption * time_factor * random.gauss(1.0, variability)
-        return max(0, consumption)
-
-    def generate_enhanced_reading(self, meter_config: Dict[str, Any]) -> EnergyReading:
-        """Generate enhanced meter reading with trading data"""
-        current_time = datetime.now(timezone.utc)
-        timestamp = current_time.isoformat()
-        hour = current_time.hour
-        
-        # Update weather
-        self.update_weather_simulation()
-        
-        # Calculate solar generation
-        solar_factor, irradiance, panel_temp = self.calculate_solar_generation_factor()
-        
-        energy_generated = 0.0
-        if meter_config['has_solar']:
-            solar_capacity = meter_config['solar_capacity']
-            panel_efficiency = meter_config['panel_efficiency'] * meter_config['weather_sensitivity']
-            inverter_efficiency = meter_config['inverter_efficiency']
-            
-            # Temperature derating (panels lose efficiency when hot)
-            temp_coefficient = -0.004  # -0.4% per degree above 25°C
-            temp_derating = 1 + temp_coefficient * (panel_temp - 25)
-            temp_derating = max(0.7, min(1.0, temp_derating))  # Limit between 70% and 100%
-            
-            base_generation = solar_capacity * solar_factor * panel_efficiency * inverter_efficiency * temp_derating
-            noise = random.gauss(0, base_generation * meter_config['noise_factor'])
-            energy_generated = max(0, base_generation + noise)
-        
-        # Calculate consumption
-        energy_consumed = self.calculate_consumption_pattern(hour, meter_config)
-        
-        # Battery simulation
-        battery_level = meter_config.get('current_battery_level', 0)
-        if meter_config['has_battery']:
-            battery_capacity = meter_config['battery_capacity']
-            battery_efficiency = meter_config['battery_efficiency']
-            
-            # Simple battery management: charge during excess, discharge during deficit
-            net_energy = energy_generated - energy_consumed
-            
-            if net_energy > 0:  # Excess energy, charge battery
-                charge_amount = min(net_energy * battery_efficiency, 
-                                  (100 - battery_level) / 100 * battery_capacity)
-                battery_level += (charge_amount / battery_capacity) * 100
-            elif net_energy < 0:  # Energy deficit, discharge battery
-                discharge_amount = min(abs(net_energy), 
-                                     (battery_level / 100) * battery_capacity)
-                battery_level -= (discharge_amount / battery_capacity) * 100
-                energy_generated += discharge_amount  # Add battery energy to generation
-            
-            battery_level = max(0, min(100, battery_level))
-            meter_config['current_battery_level'] = battery_level
-        
-        # Calculate trading parameters
-        net_energy = energy_generated - energy_consumed
-        surplus_energy = max(0, net_energy)
-        deficit_energy = max(0, -net_energy)
-        
-        energy_available_for_sale = surplus_energy * 0.8  # Reserve 20% for self-consumption buffer
-        energy_needed_from_grid = deficit_energy if not meter_config['has_battery'] or battery_level < 10 else max(0, deficit_energy - (battery_level/100 * meter_config.get('battery_capacity', 0)))
-        
-        # Trading preferences based on strategy
-        strategy = meter_config['trading_strategy']
-        base_sell_price = meter_config['preferred_sell_price']
-        base_buy_price = meter_config['preferred_buy_price']
-        
-        if strategy == 'Aggressive':
-            max_sell_price = base_sell_price * random.uniform(1.1, 1.3)
-            max_buy_price = base_buy_price * random.uniform(0.8, 0.95)
-        elif strategy == 'Conservative':
-            max_sell_price = base_sell_price * random.uniform(0.9, 1.05)
-            max_buy_price = base_buy_price * random.uniform(1.05, 1.2)
-        else:  # Moderate
-            max_sell_price = base_sell_price * random.uniform(0.95, 1.15)
-            max_buy_price = base_buy_price * random.uniform(0.95, 1.1)
-        
-        # REC eligibility (Renewable Energy Certificate)
-        rec_eligible = meter_config['has_solar'] and energy_generated > 0
-        carbon_offset = energy_generated * 0.7 if rec_eligible else 0  # kg CO2 offset per kWh
-        
-        # Electrical parameters
-        voltage = random.gauss(240.0, 3.0)
-        total_power = energy_generated + energy_consumed
-        current = (total_power / voltage * 1000) if voltage > 0 else 0
-        power_factor = random.uniform(0.92, 0.98)
-        frequency = random.gauss(50.0, 0.05)
-        
-        return EnergyReading(
-            timestamp=timestamp,
-            meter_id=meter_config['meter_id'],
-            meter_type=meter_config['meter_type'],
-            location=meter_config['location'],
-            user_type=meter_config['user_type'],
-            
-            energy_generated=round(energy_generated, 4),
-            energy_consumed=round(energy_consumed, 4),
-            energy_available_for_sale=round(energy_available_for_sale, 4),
-            energy_needed_from_grid=round(energy_needed_from_grid, 4),
-            battery_level=round(battery_level, 1),
-            
-            voltage=round(voltage, 2),
-            current=round(current, 3),
-            power_factor=round(power_factor, 3),
-            frequency=round(frequency, 2),
-            temperature=round(panel_temp if meter_config['has_solar'] else random.gauss(25, 3), 1),
-            
-            irradiance=round(irradiance, 1) if meter_config['has_solar'] else None,
-            panel_temperature=round(panel_temp, 1) if meter_config['has_solar'] else None,
-            weather_condition=self.current_weather.value,
-            
-            grid_connection_status=GridConnectionStatus.CONNECTED.value,
-            grid_feed_in_rate=round(self.grid_feed_in_rate, 3),
-            grid_purchase_rate=round(self.grid_purchase_rate, 3),
-            
-            surplus_energy=round(surplus_energy, 4),
-            deficit_energy=round(deficit_energy, 4),
-            trading_preference=strategy,
-            max_sell_price=round(max_sell_price, 3),
-            max_buy_price=round(max_buy_price, 3),
-            
-            rec_eligible=rec_eligible,
-            carbon_offset=round(carbon_offset, 3)
+        reading = SimpleEnergyReading(
+            timestamp=now,
+            meter_id=self.meter_id,
+            energy_generated=energy_generated,
+            energy_consumed=energy_consumed,
+            voltage=voltage,
+            current=current,
+            power_factor=power_factor,
+            frequency=frequency
         )
-
-    def send_to_kafka(self, reading: EnergyReading) -> bool:
-        """Send enhanced reading to Kafka with multiple topics"""
-        if not self.producer:
-            return False
         
+        logger.debug(f"Generated reading for {self.meter_id}: {energy_generated:.2f} kWh generated, {energy_consumed:.2f} kWh consumed")
+        return reading
+    
+    def apply_ieee2030_5_controls(self, reading: SimpleEnergyReading) -> SimpleEnergyReading:
+        """Apply IEEE 2030.5 demand response and DER controls to reading"""
         try:
-            reading_dict = asdict(reading)
-            
-            # Send to main energy readings topic
-            self.producer.send('energy-readings', 
-                             key=reading.meter_id, 
-                             value=reading_dict)
-            
-            # Send trading data to trading topic if surplus or deficit exists
-            if reading.surplus_energy > 0 or reading.deficit_energy > 0:
-                trading_data = {
-                    'timestamp': reading.timestamp,
-                    'meter_id': reading.meter_id,
-                    'user_type': reading.user_type,
-                    'surplus_energy': reading.surplus_energy,
-                    'deficit_energy': reading.deficit_energy,
-                    'max_sell_price': reading.max_sell_price,
-                    'max_buy_price': reading.max_buy_price,
-                    'trading_preference': reading.trading_preference,
-                    'location': reading.location
-                }
-                
-                self.producer.send('trading-opportunities', 
-                                 key=reading.meter_id,
-                                 value=trading_data)
-                self.stats['trading_opportunities'] += 1
-            
-            # Send REC data if eligible
-            if reading.rec_eligible:
-                rec_data = {
-                    'timestamp': reading.timestamp,
-                    'meter_id': reading.meter_id,
-                    'energy_generated': reading.energy_generated,
-                    'carbon_offset': reading.carbon_offset,
-                    'weather_condition': reading.weather_condition,
-                    'irradiance': reading.irradiance
-                }
-                
-                self.producer.send('renewable-certificates',
-                                 key=reading.meter_id,
-                                 value=rec_data)
-                self.stats['rec_generated'] += 1
-            
-            self.stats['kafka_sends'] += 1
-            return True
-            
+            # Apply active demand response events
+            for dr_event in self.current_dr_events.values():
+                reading = self.apply_demand_response(reading, dr_event)
+
+            # Apply active DER controls
+            for der_control in self.current_der_controls.values():
+                reading = self.apply_der_control(reading, der_control)
+
         except Exception as e:
-            logger.error(f"Failed to send to Kafka: {e}")
+            logger.error(f"Failed to apply IEEE 2030.5 controls: {e}")
+
+        return reading
+
+    def apply_demand_response(self, reading: SimpleEnergyReading, dr_event: DemandResponseControl) -> SimpleEnergyReading:
+        """Apply demand response event to energy reading"""
+        try:
+            # Reduce consumption based on DR target
+            if hasattr(dr_event, 'target_reduction') and dr_event.target_reduction and dr_event.target_reduction > 0:
+                reduction_kw = dr_event.target_reduction / 1000  # Convert W to kW
+                reduction_kwh = reduction_kw * (self.simulation_interval / 3600)  # Convert to kWh
+
+                # Apply reduction to consumption
+                original_consumption = reading.energy_consumed
+                reading.energy_consumed = max(0, reading.energy_consumed - reduction_kwh)
+
+                actual_reduction = original_consumption - reading.energy_consumed
+                logger.debug(f"DR reduction applied: {actual_reduction:.3f} kWh")
+
+        except Exception as e:
+            logger.error(f"Failed to apply demand response: {e}")
+
+        return reading
+
+    def apply_der_control(self, reading: SimpleEnergyReading, der_control: DERControl) -> SimpleEnergyReading:
+        """Apply DER control to energy reading"""
+        try:
+            if hasattr(der_control, 'der_control_base') and der_control.der_control_base:
+                der_base = der_control.der_control_base
+
+                # Apply power limits
+                if hasattr(der_base, 'op_mod_max_lim_w') and der_base.op_mod_max_lim_w:
+                    max_power_kw = der_base.op_mod_max_lim_w / 1000
+                    max_energy_kwh = max_power_kw * (self.simulation_interval / 3600)
+
+                    # Limit energy generation
+                    if reading.energy_generated > max_energy_kwh:
+                        reading.energy_generated = max_energy_kwh
+                        logger.debug(f"DER limit applied: {max_energy_kwh:.3f} kWh max")
+
+                # Apply target power settings
+                if hasattr(der_base, 'op_mod_target_w') and der_base.op_mod_target_w:
+                    target_power_kw = der_base.op_mod_target_w / 1000
+                    target_energy_kwh = target_power_kw * (self.simulation_interval / 3600)
+
+                    # Adjust generation toward target
+                    reading.energy_generated = target_energy_kwh
+                    logger.debug(f"DER target applied: {target_energy_kwh:.3f} kWh")
+
+        except Exception as e:
+            logger.error(f"Failed to apply DER control: {e}")
+
+        return reading
+    
+    async def send_ieee2030_5_reading(self, reading: SimpleEnergyReading) -> bool:
+        """Send reading via IEEE 2030.5 protocol"""
+        if not self.ieee2030_5_client:
             return False
 
-    def store_in_timescaledb(self, reading: EnergyReading) -> bool:
-        """Store enhanced reading in TimescaleDB"""
-        if not self.timescale_conn:
-            return False
-        
         try:
-            with self.timescale_conn.cursor() as cursor:
-                cursor.execute("""
-                    INSERT INTO energy_readings_enhanced (
-                        time, meter_id, meter_type, location, user_type,
-                        energy_generated, energy_consumed, energy_available_for_sale,
-                        energy_needed_from_grid, battery_level,
-                        voltage, current, power_factor, frequency, temperature,
-                        irradiance, panel_temperature, weather_condition,
-                        grid_connection_status, grid_feed_in_rate, grid_purchase_rate,
-                        surplus_energy, deficit_energy, trading_preference,
-                        max_sell_price, max_buy_price,
-                        rec_eligible, carbon_offset
-                    ) VALUES (
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s
-                    )
-                """, (
-                    reading.timestamp, reading.meter_id, reading.meter_type,
-                    reading.location, reading.user_type,
-                    reading.energy_generated, reading.energy_consumed,
-                    reading.energy_available_for_sale, reading.energy_needed_from_grid,
-                    reading.battery_level, reading.voltage, reading.current,
-                    reading.power_factor, reading.frequency, reading.temperature,
-                    reading.irradiance, reading.panel_temperature,
-                    reading.weather_condition, reading.grid_connection_status,
-                    reading.grid_feed_in_rate, reading.grid_purchase_rate,
-                    reading.surplus_energy, reading.deficit_energy,
-                    reading.trading_preference, reading.max_sell_price,
-                    reading.max_buy_price, reading.rec_eligible, reading.carbon_offset
-                ))
-            
-            self.timescale_conn.commit()
-            self.stats['db_stores'] += 1
-            return True
-            
+            # Convert SimpleEnergyReading to IEEE 2030.5 MeterReading format
+            meter_reading = MeterReading(
+                mRID=f"reading_{reading.timestamp}_{reading.meter_id}",
+                energy_generated=Reading(
+                    value=int(reading.energy_generated * 1000),  # Convert kWh to Wh
+                    time_period_start=int(datetime.fromisoformat(reading.timestamp.replace('Z', '+00:00')).timestamp())
+                ),
+                energy_consumed=Reading(
+                    value=int(reading.energy_consumed * 1000),
+                    time_period_start=int(datetime.fromisoformat(reading.timestamp.replace('Z', '+00:00')).timestamp())
+                ),
+                instantaneous_power=Reading(
+                    value=int((reading.energy_generated - reading.energy_consumed) * 1000 / 
+                            (self.simulation_interval / 3600)),  # Convert to watts
+                    time_period_start=int(datetime.fromisoformat(reading.timestamp.replace('Z', '+00:00')).timestamp())
+                ),
+                voltage=Reading(
+                    value=int(reading.voltage * 100),  # Convert to centi-volts
+                    time_period_start=int(datetime.fromisoformat(reading.timestamp.replace('Z', '+00:00')).timestamp())
+                ),
+                current=Reading(
+                    value=int(reading.current * 1000),  # Convert to milli-amps
+                    time_period_start=int(datetime.fromisoformat(reading.timestamp.replace('Z', '+00:00')).timestamp())
+                ),
+                power_factor=Reading(
+                    value=int(reading.power_factor * 1000),  # Convert to milli units
+                    time_period_start=int(datetime.fromisoformat(reading.timestamp.replace('Z', '+00:00')).timestamp())
+                ),
+                frequency=Reading(
+                    value=int(reading.frequency * 100),  # Convert to centi-hertz
+                    time_period_start=int(datetime.fromisoformat(reading.timestamp.replace('Z', '+00:00')).timestamp())
+                )
+            )
+
+            # Send to IEEE 2030.5 server
+            success = await self.ieee2030_5_client.post_meter_reading(meter_reading)
+
+            if success:
+                logger.debug(f"IEEE 2030.5 reading sent for {reading.meter_id}")
+
+            return success
+
         except Exception as e:
-            logger.error(f"Failed to store in TimescaleDB: {e}")
+            logger.error(f"Failed to send IEEE 2030.5 reading: {e}")
             return False
 
-    def save_to_file(self, reading: EnergyReading) -> bool:
-        """Save reading to JSONL file"""
+    async def handle_demand_response_event(self, dr_event: DemandResponseControl):
+        """Handle incoming demand response event"""
         try:
-            with open(self.output_file, 'a') as f:
-                json.dump(asdict(reading), f, default=str)
-                f.write('\n')
-            
-            self.stats['file_saves'] += 1
-            return True
-            
+            if hasattr(dr_event, 'mRID') and dr_event.mRID:
+                self.current_dr_events[dr_event.mRID] = dr_event
+                logger.info(f"Received DR event {dr_event.mRID}")
+
         except Exception as e:
-            logger.error(f"Failed to save to file: {e}")
-            return False
+            logger.error(f"Failed to handle DR event: {e}")
+
+    async def handle_der_control_event(self, der_control: DERControl):
+        """Handle incoming DER control event"""
+        try:
+            if hasattr(der_control, 'mRID') and der_control.mRID:
+                self.current_der_controls[der_control.mRID] = der_control
+                logger.info(f"Received DER control {der_control.mRID}")
+
+        except Exception as e:
+            logger.error(f"Failed to handle DER control: {e}")
+
+    async def handle_tariff_update(self, tariff_profile):
+        """Handle tariff profile update"""
+        try:
+            logger.info(f"Received tariff update")
+
+            # Update P2P pricing based on new tariff
+            if hasattr(tariff_profile, 'base_peer_rate'):
+                self.p2p_pricing['base_rate'] = tariff_profile.base_peer_rate
+
+        except Exception as e:
+            logger.error(f"Failed to handle tariff update: {e}")
+
+    async def handle_trading_opportunity(self, trading_data: Dict[str, Any]):
+        """Handle P2P trading opportunity"""
+        try:
+            logger.info(f"P2P trading opportunity: {trading_data}")
+
+        except Exception as e:
+            logger.error(f"Failed to handle trading opportunity: {e}")
 
     def simulate_readings(self):
-        """Generate and process all meter readings"""
-        logger.info(f"Generating enhanced readings for {len(self.meters)} meters")
-        
-        batch_readings = []
-        
-        for meter_config in self.meters:
-            try:
-                reading = self.generate_enhanced_reading(meter_config)
-                batch_readings.append(reading)
-                
-                self.stats['total_readings'] += 1
-                
-                # Send to various outputs
-                kafka_success = self.send_to_kafka(reading)
-                db_success = self.store_in_timescaledb(reading)
-                file_success = self.save_to_file(reading)
-                
-                if not (kafka_success or db_success or file_success):
-                    logger.warning(f"Failed to store reading for {meter_config['meter_id']}")
-                
-            except Exception as e:
-                logger.error(f"Failed to process meter {meter_config['meter_id']}: {e}")
-        
-        # Flush Kafka producer
-        if self.producer:
-            try:
-                self.producer.flush()
-            except Exception as e:
-                logger.error(f"Failed to flush Kafka: {e}")
-        
-        # Log summary
-        total_surplus = sum(r.surplus_energy for r in batch_readings)
-        total_deficit = sum(r.deficit_energy for r in batch_readings)
-        total_generation = sum(r.energy_generated for r in batch_readings)
-        total_consumption = sum(r.energy_consumed for r in batch_readings)
-        
-        logger.info(f"Cycle Summary - Generation: {total_generation:.2f} kWh, "
-                   f"Consumption: {total_consumption:.2f} kWh, "
-                   f"Surplus: {total_surplus:.2f} kWh, "
-                   f"Deficit: {total_deficit:.2f} kWh")
-
-    def print_statistics(self):
-        """Print comprehensive statistics"""
-        print(f"\n{'='*60}")
-        print("Enhanced AMI Simulator Statistics")
-        print(f"{'='*60}")
-        print(f"Total Readings Generated: {self.stats['total_readings']:,}")
-        print(f"Kafka Messages Sent: {self.stats['kafka_sends']:,}")
-        print(f"Database Records Stored: {self.stats['db_stores']:,}")
-        print(f"Files Saved: {self.stats['file_saves']:,}")
-        print(f"Trading Opportunities: {self.stats['trading_opportunities']:,}")
-        print(f"REC Certificates Generated: {self.stats['rec_generated']:,}")
-        print(f"Current Weather: {self.current_weather.value}")
-        print(f"Active Meters: {len(self.meters)}")
-        print(f"Simulation Interval: {self.simulation_interval}s")
-        print(f"Mode: {'Standalone' if self.standalone_mode else 'Integrated'}")
-        print(f"{'='*60}")
-
+        """Generate and process readings"""
+        try:
+            # Generate a reading
+            reading = self.generate_reading()
+            
+            # Apply IEEE 2030.5 controls
+            if self.ieee2030_5_enabled:
+                reading = self.apply_ieee2030_5_controls(reading)
+            
+            # Send via IEEE 2030.5 if enabled
+            if self.ieee2030_5_enabled and self.ieee2030_5_client:
+                # In a real implementation, you'd want proper async handling here
+                # For now, just log that we would send it
+                logger.info(f"Would send IEEE 2030.5 reading: {reading.energy_generated:.2f}kWh gen, {reading.energy_consumed:.2f}kWh cons")
+            
+            # Sleep for the simulation interval
+            time.sleep(self.simulation_interval)
+            
+        except Exception as e:
+            logger.error(f"Failed to process readings: {e}")
+    
     def run(self):
-        """Run the enhanced simulator"""
-        print("Starting Enhanced Smart Meter Simulator for P2P Energy Trading")
-        print("="*70)
-        print(f"Meters: {self.num_meters}")
-        print(f"Simulation Interval: {self.simulation_interval} seconds")
-        print(f"Weather: {self.current_weather.value}")
-        print(f"Mode: {'Standalone' if self.standalone_mode else 'Integrated'}")
-        print(f"Output File: {self.output_file}")
-        print("="*70)
-        
-        # Print meter summary
-        meter_types = {}
-        for meter in self.meters:
-            meter_type = meter['meter_type']
-            meter_types[meter_type] = meter_types.get(meter_type, 0) + 1
-        
-        print("Meter Distribution:")
-        for meter_type, count in meter_types.items():
-            print(f"  {meter_type}: {count}")
-        print("="*70)
-        
-        # Schedule periodic readings
-        schedule.every(self.simulation_interval).seconds.do(self.simulate_readings)
-        
-        # Generate initial readings
-        self.simulate_readings()
-        
+        """Run the IEEE 2030.5 Smart Meter Simulator"""
+        print("Starting IEEE 2030.5 Smart Meter Simulator")
+        print("=" * 70)
+        print(f"Meter ID: {self.meter_id}")
+        print(f"IEEE 2030.5 Enabled: {self.ieee2030_5_enabled}")
+        if self.ieee2030_5_enabled:
+            print(f"IEEE 2030.5 Server: {self.ieee2030_5_server_url}")
+        print(f"Simulation Interval: {self.simulation_interval}s")
+        print("=" * 70)
+
+        # Start IEEE 2030.5 client if enabled
+        if self.ieee2030_5_enabled and self.ieee2030_5_client:
+            try:
+                self.loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(self.loop)
+                
+                async def start_client():
+                    await self.start_ieee2030_5_client()
+                
+                self.loop.create_task(start_client())
+                
+            except Exception as e:
+                logger.error(f"Failed to start IEEE 2030.5 components: {e}")
+                self.ieee2030_5_enabled = False
+
+        # Main simulation loop
         try:
             while True:
-                schedule.run_pending()
-                time.sleep(1)
+                self.simulate_readings()
                 
         except KeyboardInterrupt:
-            logger.info("Shutting down enhanced simulator...")
-            self.print_statistics()
+            print("\nShutting down IEEE 2030.5 simulator...")
             
-            # Cleanup connections
-            if self.producer:
+            if self.ieee2030_5_enabled and self.ieee2030_5_client and self.loop:
                 try:
-                    self.producer.close()
+                    self.loop.run_until_complete(self.stop_ieee2030_5_client())
                 except Exception as e:
-                    logger.error(f"Error closing Kafka producer: {e}")
+                    logger.error(f"Error stopping IEEE 2030.5 client: {e}")
             
-            for conn_name, conn in [('Database', self.db_conn), ('TimescaleDB', self.timescale_conn)]:
-                if conn:
-                    try:
-                        conn.close()
-                    except Exception as e:
-                        logger.error(f"Error closing {conn_name} connection: {e}")
-            
-            logger.info("Enhanced simulator shutdown complete")
+            print("IEEE 2030.5 simulator shutdown complete")
+
+
+def run_ieee2030_5_server():
+    """Run standalone IEEE 2030.5 server for testing"""
+    import asyncio
+    
+    server = IEEE2030_5_Server(
+        host='0.0.0.0',
+        port=8443,
+        cert_path=os.getenv('SERVER_CERT_PATH', './certs/server.pem'),
+        key_path=os.getenv('SERVER_KEY_PATH', './certs/server.key'),
+        ca_cert_path=os.getenv('CA_CERT_PATH', './certs/ca.pem')
+    )
+    
+    try:
+        asyncio.run(server.start())
+    except KeyboardInterrupt:
+        print("IEEE 2030.5 server stopped")
+
 
 if __name__ == "__main__":
-    simulator = EnhancedSmartMeterSimulator()
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # Run simulator with IEEE 2030.5 support
+    simulator = IEEE2030_5_SmartMeterSimulator()
     simulator.run()

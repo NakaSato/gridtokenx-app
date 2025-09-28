@@ -83,7 +83,6 @@ pub async fn submit_transaction(
     // In production, this would use Solana RPC client
     let signature = format!("tx_{}", Uuid::new_v4().to_string().replace('-', ""));
     
-    // Store transaction record in database
     let fee_lamports = payload.priority_fee.to_string().parse::<i64>().unwrap_or(0);
     
     sqlx::query!(
@@ -97,7 +96,7 @@ pub async fn submit_transaction(
         payload.program_id,
         "submit_transaction".to_string(),
         fee_lamports,
-        payload.compute_units as i32
+        payload.compute_units.unwrap_or(10000) as i64
     )
     .execute(&state.db)
     .await

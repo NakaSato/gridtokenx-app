@@ -237,13 +237,6 @@ docker-compose -f docker-compose.test.yml up --build
 
 ### Custom Extensions
 ```python
-from enhanced_simulator import EnhancedSmartMeterSimulator
-
-# Extend the simulator
-class CustomSimulator(EnhancedSmartMeterSimulator):
-    def custom_trading_logic(self):
-        # Add custom trading algorithms
-        pass
 ```
 
 ## Monitoring & Alerts

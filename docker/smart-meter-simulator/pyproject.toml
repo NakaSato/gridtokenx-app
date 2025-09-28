@@ -1,7 +1,7 @@
 [project]
 name = "smart-meter-simulator"
 version = "0.1.0"
-description = "Smart Meter Simulator for P2P Energy Trading Platform"
+description = "IEEE 2030.5 Smart Meter Simulator for P2P Energy Trading Platform"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -11,6 +11,14 @@ dependencies = [
     "schedule>=1.2.0",
     "faker>=37.6.0",
     "numpy>=2.3.2",
+    # IEEE 2030.5 Protocol Support
+    "aiohttp>=3.8.0",
+    "cryptography>=41.0.0",
+    "xmltodict>=0.13.0",
+    "pydantic>=2.0.0",
+    # Additional utilities
+    "pandas>=2.0.0",
+    "requests>=2.31.0",
 ]
 
 [project.optional-dependencies]
