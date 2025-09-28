@@ -8,7 +8,7 @@
     "version": "2.0.0"
   },
   "api_gateway": {
-    "url": "http://localhost:8080",
+    "url": "https://api-gateway.gridtokenx.local:8443",
     "endpoints": {
       "device_capability": "/dcap",
       "end_device": "/edev",

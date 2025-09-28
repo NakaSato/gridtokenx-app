@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("G365L8A4Y3xmp5aN2GGLj2SJr5KetgE5F57PaFvCgSgG");
+declare_id!("5DF1fmjrXTtG7qsFaLUm5TjJMG7M1a2V7kyTWPjoADV5");
 
 #[program]
 pub mod oracle {

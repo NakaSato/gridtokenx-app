@@ -137,7 +137,8 @@ services:
   # Smart Meter Simulator
   smart-meter-simulator:
     build:
-      context: ./docker/smart-meter-simulator
+      context: ./smart-meter-simulator
+      dockerfile: ../docker/smart-meter-simulator/Dockerfile
     container_name: p2p-smart-meter-simulator
     depends_on:
       - postgres

@@ -22,7 +22,7 @@ import {
 } from '../instructions';
 
 export const ENERGY_TOKEN_PROGRAM_ADDRESS =
-  'FaELH72fUMRaLTX3ersmQLr4purfHGvJccm1BXfDPL6r' as Address<'FaELH72fUMRaLTX3ersmQLr4purfHGvJccm1BXfDPL6r'>;
+  'GizasjPBdHw9tkme1jwpVSsa14USHBaYDCuRqziUdfaa' as Address<'GizasjPBdHw9tkme1jwpVSsa14USHBaYDCuRqziUdfaa'>;
 
 export enum EnergyTokenAccount {
   TokenInfo,
@@ -121,7 +121,7 @@ export function identifyEnergyTokenInstruction(
 }
 
 export type ParsedEnergyTokenInstruction<
-  TProgram extends string = 'FaELH72fUMRaLTX3ersmQLr4purfHGvJccm1BXfDPL6r',
+  TProgram extends string = 'GizasjPBdHw9tkme1jwpVSsa14USHBaYDCuRqziUdfaa',
 > =
   | ({
       instructionType: EnergyTokenInstruction.AddRecValidator;

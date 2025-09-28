@@ -2,7 +2,6 @@
 name = "smart-meter-simulator"
 version = "0.1.0"
 description = "IEEE 2030.5 Smart Meter Simulator for P2P Energy Trading Platform"
-readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "kafka-python>=2.0.2",
