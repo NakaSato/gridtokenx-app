@@ -1,0 +1,291 @@
+{
+  "campus": {
+    "name": "UTCC University",
+    "location": {
+      "country": "Thailand",
+      "state": "Bangkok",
+      "city": "Bangkok",
+      "coordinates": {
+        "latitude": 13.7563,
+        "longitude": 100.5018
+      }
+    },
+    "timezone": "Asia/Bangkok"
+  },
+  "deployment": {
+    "phase": 2,
+    "meter_count": 25,
+    "deployment_date": "2024-12-19",
+    "version": "2.0.0"
+  },
+  "certificates": {
+    "ca_name": "GridTokenX UTCC CA",
+    "authority": {
+      "country": "TH",
+      "state": "Bangkok",
+      "locality": "Bangkok",
+      "organization": "UTCC University",
+      "organizational_unit": "GridTokenX Campus Network",
+      "common_name": "GridTokenX UTCC Root CA"
+    },
+    "validity_days": 3650
+  },
+  "network": {
+    "ieee2030_5_port": 8444,
+    "api_port": 8080,
+    "secure_api_port": 8443,
+    "tls_enabled": true,
+    "certificate_authentication": true
+  },
+  "meters": [
+    {
+      "id": "AMI_METER_UTCC_001",
+      "building": "Engineering Building A",
+      "floor": 1,
+      "type": "prosumer",
+      "capacity_kw": 150.0,
+      "solar_installed": true,
+      "battery_storage": true
+    },
+    {
+      "id": "AMI_METER_UTCC_002",
+      "building": "Engineering Building A",
+      "floor": 2,
+      "type": "consumer",
+      "capacity_kw": 120.0,
+      "solar_installed": false,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_003",
+      "building": "Engineering Building A",
+      "floor": 3,
+      "type": "prosumer",
+      "capacity_kw": 140.0,
+      "solar_installed": true,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_004",
+      "building": "Engineering Building B",
+      "floor": 1,
+      "type": "prosumer",
+      "capacity_kw": 160.0,
+      "solar_installed": true,
+      "battery_storage": true
+    },
+    {
+      "id": "AMI_METER_UTCC_005",
+      "building": "Engineering Building B",
+      "floor": 2,
+      "type": "consumer",
+      "capacity_kw": 110.0,
+      "solar_installed": false,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_006",
+      "building": "Business Administration Building",
+      "floor": 1,
+      "type": "prosumer",
+      "capacity_kw": 180.0,
+      "solar_installed": true,
+      "battery_storage": true
+    },
+    {
+      "id": "AMI_METER_UTCC_007",
+      "building": "Business Administration Building",
+      "floor": 2,
+      "type": "consumer",
+      "capacity_kw": 130.0,
+      "solar_installed": false,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_008",
+      "building": "Business Administration Building",
+      "floor": 3,
+      "type": "prosumer",
+      "capacity_kw": 145.0,
+      "solar_installed": true,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_009",
+      "building": "Science Building",
+      "floor": 1,
+      "type": "consumer",
+      "capacity_kw": 200.0,
+      "solar_installed": false,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_010",
+      "building": "Science Building",
+      "floor": 2,
+      "type": "prosumer",
+      "capacity_kw": 175.0,
+      "solar_installed": true,
+      "battery_storage": true
+    },
+    {
+      "id": "AMI_METER_UTCC_011",
+      "building": "Library Building",
+      "floor": 1,
+      "type": "consumer",
+      "capacity_kw": 100.0,
+      "solar_installed": false,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_012",
+      "building": "Library Building",
+      "floor": 2,
+      "type": "prosumer",
+      "capacity_kw": 90.0,
+      "solar_installed": true,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_013",
+      "building": "Student Center",
+      "floor": 1,
+      "type": "prosumer",
+      "capacity_kw": 250.0,
+      "solar_installed": true,
+      "battery_storage": true
+    },
+    {
+      "id": "AMI_METER_UTCC_014",
+      "building": "Student Center",
+      "floor": 2,
+      "type": "consumer",
+      "capacity_kw": 180.0,
+      "solar_installed": false,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_015",
+      "building": "Administration Building",
+      "floor": 1,
+      "type": "consumer",
+      "capacity_kw": 120.0,
+      "solar_installed": false,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_016",
+      "building": "Administration Building",
+      "floor": 2,
+      "type": "prosumer",
+      "capacity_kw": 135.0,
+      "solar_installed": true,
+      "battery_storage": true
+    },
+    {
+      "id": "AMI_METER_UTCC_017",
+      "building": "Dormitory A",
+      "floor": 1,
+      "type": "prosumer",
+      "capacity_kw": 300.0,
+      "solar_installed": true,
+      "battery_storage": true
+    },
+    {
+      "id": "AMI_METER_UTCC_018",
+      "building": "Dormitory A",
+      "floor": 2,
+      "type": "prosumer",
+      "capacity_kw": 280.0,
+      "solar_installed": true,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_019",
+      "building": "Dormitory B",
+      "floor": 1,
+      "type": "prosumer",
+      "capacity_kw": 290.0,
+      "solar_installed": true,
+      "battery_storage": true
+    },
+    {
+      "id": "AMI_METER_UTCC_020",
+      "building": "Dormitory B",
+      "floor": 2,
+      "type": "consumer",
+      "capacity_kw": 260.0,
+      "solar_installed": false,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_021",
+      "building": "Cafeteria",
+      "floor": 1,
+      "type": "prosumer",
+      "capacity_kw": 220.0,
+      "solar_installed": true,
+      "battery_storage": true
+    },
+    {
+      "id": "AMI_METER_UTCC_022",
+      "building": "Gymnasium",
+      "floor": 1,
+      "type": "consumer",
+      "capacity_kw": 400.0,
+      "solar_installed": false,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_023",
+      "building": "Parking Structure",
+      "floor": 1,
+      "type": "prosumer",
+      "capacity_kw": 100.0,
+      "solar_installed": true,
+      "battery_storage": true
+    },
+    {
+      "id": "AMI_METER_UTCC_024",
+      "building": "Maintenance Building",
+      "floor": 1,
+      "type": "consumer",
+      "capacity_kw": 80.0,
+      "solar_installed": false,
+      "battery_storage": false
+    },
+    {
+      "id": "AMI_METER_UTCC_025",
+      "building": "Research Center",
+      "floor": 1,
+      "type": "prosumer",
+      "capacity_kw": 320.0,
+      "solar_installed": true,
+      "battery_storage": true
+    }
+  ],
+  "database": {
+    "host": "database",
+    "port": 5432,
+    "name": "gridtokenx_utcc",
+    "user": "gridtokenx"
+  },
+  "redis": {
+    "host": "redis",
+    "port": 6379,
+    "db": 0
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": "logs/utcc_campus.log",
+    "max_size": "10MB",
+    "backup_count": 5
+  },
+  "monitoring": {
+    "health_check_interval": 30,
+    "metrics_enabled": true,
+    "prometheus_port": 9090,
+    "grafana_enabled": true
+  }
+}
