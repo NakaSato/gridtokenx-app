@@ -55,63 +55,63 @@
   - Write integration tests for real-time functionality
   - _Requirements: 1.4, 2.4_
 
-- [-] 3. Build transaction history component
+- [x] 3. Build transaction history component
   - Create transaction history table with pagination and sorting
   - Implement advanced filtering by date, type, and energy type
   - Add export functionality for CSV and JSON formats
   - Include transaction status tracking with blockchain links
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [-] 3.1 Create transaction history table
+- [x] 3.1 Create transaction history table
   - Build `transaction-history.tsx` component with data table
   - Implement pagination for large transaction datasets
   - Add column sorting for date, amount, price, and status
   - Create responsive table layout for mobile devices
   - _Requirements: 3.1, 3.2_
 
-- [ ] 3.2 Implement filtering and search functionality
+- [x] 3.2 Implement filtering and search functionality
   - Add date range picker for transaction filtering
   - Create dropdown filters for transaction type and energy type
   - Implement search functionality for transaction hash and counterparty
   - Write unit tests for all filtering logic
   - _Requirements: 3.3_
 
-- [ ] 3.3 Add export and blockchain integration
+- [x] 3.3 Add export and blockchain integration
   - Implement CSV and JSON export functionality
   - Add blockchain explorer links for transaction hashes
   - Create transaction status polling for pending transactions
   - Add error handling for failed or cancelled transactions
   - _Requirements: 3.4_
 
-- [ ] 4. Create token portfolio component
+- [x] 4. Create token portfolio component
   - Build token balance display with real-time USD values
   - Implement portfolio performance tracking and metrics
   - Add token contract information and blockchain links
   - Create refresh functionality for manual balance updates
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 4.1 Build token balance display
+- [x] 4.1 Build token balance display
   - Create `token-portfolio.tsx` component with balance cards
   - Implement real-time balance updates using account queries
   - Add USD value calculations with price change indicators
   - Create loading states and error handling for balance queries
   - _Requirements: 4.1, 4.2_
 
-- [ ] 4.2 Add portfolio metrics and performance tracking
+- [x] 4.2 Add portfolio metrics and performance tracking
   - Calculate total portfolio value and 24h change percentage
   - Implement individual token performance metrics
   - Add portfolio allocation charts using recharts library
   - Create unit tests for portfolio calculation functions
   - _Requirements: 4.2, 4.3_
 
-- [ ] 4.3 Integrate token contract information
+- [x] 4.3 Integrate token contract information
   - Display token contract addresses with copy functionality
   - Add blockchain explorer links for token contracts
   - Implement token metadata fetching (name, symbol, decimals)
   - Create manual refresh button for balance updates
   - _Requirements: 4.3, 4.4_
 
-- [ ] 5. Build market overview component
+- [-] 5. Build market overview component
   - Create interactive price charts with multiple timeframes
   - Implement market metrics display (volume, price changes)
   - Add price trend analysis and market alerts

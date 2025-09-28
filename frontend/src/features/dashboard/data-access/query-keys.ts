@@ -16,12 +16,22 @@ export const tradingQueryKeys = {
   transactionHistoryByUser: (publicKey: string, page: number, pageSize: number, filters: any) => 
     [...tradingQueryKeys.transactionHistory(), publicKey, page, pageSize, filters] as const,
   
+  // Transaction status keys
+  transactionStatus: (transactionHash: string) => 
+    [...tradingQueryKeys.all, 'transaction-status', transactionHash] as const,
+  
   // Network status keys
   networkStatus: () => [...tradingQueryKeys.all, 'network'] as const,
   
   // Token balance keys
   tokenBalances: () => [...tradingQueryKeys.all, 'balances'] as const,
   tokenBalancesByUser: (publicKey: string) => [...tradingQueryKeys.tokenBalances(), publicKey] as const,
+  
+  // Token metadata keys
+  tokenMetadata: (contractAddress: string) => 
+    [...tradingQueryKeys.all, 'token-metadata', contractAddress] as const,
+  multipleTokenMetadata: (contractAddresses: string[]) => 
+    [...tradingQueryKeys.all, 'token-metadata', 'multiple', contractAddresses.sort()] as const,
   
   // Order keys
   orders: () => [...tradingQueryKeys.all, 'orders'] as const,
