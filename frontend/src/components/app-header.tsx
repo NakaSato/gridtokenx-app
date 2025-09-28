@@ -18,8 +18,10 @@ export function AppHeader({ links = [] }: { links: { label: string; path: string
     <header className="relative z-50 px-4 py-2 bg-card/50">
       <div className="mx-auto flex justify-between items-center">
         <div className="flex items-baseline gap-4">
-          <Link to="/" className="text-xl hover:text-neutral-500 dark:hover:text-white">
-            <span>Gridtokenxapp</span>
+          <Link to="/" className="text-xl font-bold hover:text-neutral-500 dark:hover:text-white">
+            <span className="bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+              GridTokenX
+            </span>
           </Link>
           <div className="hidden md:flex items-center">
             <ul className="flex gap-4 flex-nowrap items-center">

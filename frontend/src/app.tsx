@@ -3,12 +3,12 @@ import { AppLayout } from '@/components/app-layout.tsx'
 import { AppRoutes } from '@/app-routes.tsx'
 
 const links: { label: string; path: string }[] = [
-  //
   { label: 'Home', path: '/' },
-  { label: 'Account', path: '/account' },
-  { label: 'Gridtokenxapp Program', path: '/gridtokenxapp' },
+  { label: 'Dashboard', path: '/dashboard' },
   { label: 'Energy Trading', path: '/energy-trading' },
-  { label: 'PoA Governance', path: '/governance' },
+  { label: 'Governance', path: '/governance' },
+  { label: 'Registry', path: '/registry' },
+  { label: 'My Account', path: '/account' },
 ]
 
 export function App() {
