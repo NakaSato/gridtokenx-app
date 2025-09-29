@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GridTokenX Smart Meter Real-Time Monitor</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .status {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .status-item {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            min-width: 150px;
+            margin: 5px;
+        }
+        .status-item.connected {
+            background: rgba(46, 204, 113, 0.3);
+        }
+        .status-item.disconnected {
+            background: rgba(231, 76, 60, 0.3);
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .meter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            max-height: 600px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .meter-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+        .meter-card.consumer {
+            border-left-color: #e74c3c;
+        }
+        .meter-card.prosumer {
+            border-left-color: #27ae60;
+        }
+        .meter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .meter-id {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .meter-type {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            text-transform: uppercase;
+        }
+        .consumer { background: #e74c3c; color: white; }
+        .prosumer { background: #27ae60; color: white; }
+        .meter-readings {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+        .reading {
+            display: flex;
+            justify-content: space-between;
+        }
+        .reading-label { opacity: 0.8; }
+        .reading-value { font-weight: bold; }
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        .timestamp {
+            text-align: center;
+            opacity: 0.7;
+            font-size: 0.9em;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏫 UTCC University GridTokenX Smart Meter Monitor</h1>
+
+        <div class="controls">
+            <button onclick="connectWebSockets()">Connect</button>
+            <button onclick="disconnectWebSockets()">Disconnect</button>
+            <button onclick="clearData()">Clear Data</button>
+        </div>
+
+        <div class="status">
+            <div class="status-item" id="readings-status">
+                📊 Readings WS: <span id="readings-status-text">Disconnected</span>
+            </div>
+            <div class="status-item" id="summary-status">
+                📈 Summary WS: <span id="summary-status-text">Disconnected</span>
+            </div>
+            <div class="status-item" id="meters-count">
+                🔢 Meters: <span id="meters-count-text">0</span>
+            </div>
+            <div class="status-item" id="update-interval">
+                ⏱️ Interval: <span id="update-interval-text">15s</span>
+            </div>
+        </div>
+
+        <div class="metrics">
+            <div class="metric-card">
+                <div>⚡ Total Consumption</div>
+                <div class="metric-value" id="total-consumption">0.00 kW</div>
+            </div>
+            <div class="metric-card">
+                <div>☀️ Total Generation</div>
+                <div class="metric-value" id="total-generation">0.00 kW</div>
+            </div>
+            <div class="metric-card">
+                <div>🔋 Grid Feed-in</div>
+                <div class="metric-value" id="grid-feed-in">0.00 kW</div>
+            </div>
+            <div class="metric-card">
+                <div>⚖️ Net Balance</div>
+                <div class="metric-value" id="net-balance">0.00 kW</div>
+            </div>
+        </div>
+
+        <h2>Individual Meter Readings</h2>
+        <div class="meter-grid" id="meter-grid">
+            <!-- Meter cards will be dynamically added here -->
+        </div>
+
+        <div class="timestamp" id="last-update">
+            Last update: Never
+        </div>
+    </div>
+
+    <script>
+        let readingsWs = null;
+        let summaryWs = null;
+        let currentReadings = [];
+        let currentSummary = {};
+
+        function updateStatus(elementId, text, connected = false) {
+            const element = document.getElementById(elementId);
+            const textElement = document.getElementById(elementId + '-text');
+            textElement.textContent = text;
+            element.className = element.className.replace(' connected', '').replace(' disconnected', '');
+            element.classList.add(connected ? 'connected' : 'disconnected');
+        }
+
+        function connectWebSockets() {
+            // Connect to readings WebSocket
+            if (!readingsWs || readingsWs.readyState === WebSocket.CLOSED) {
+                readingsWs = new WebSocket('ws://localhost:4040/ws/readings');
+
+                readingsWs.onopen = () => {
+                    console.log('Readings WebSocket connected');
+                    updateStatus('readings-status', 'Connected', true);
+                    readingsWs.send(JSON.stringify({ type: 'subscribe' }));
+                };
+
+                readingsWs.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'readings_update') {
+                            currentReadings = data.data;
+                            updateMeterDisplay();
+                            updateMetrics();
+                            document.getElementById('last-update').textContent =
+                                `Last update: ${new Date(data.timestamp).toLocaleString()}`;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing readings message:', e);
+                    }
+                };
+
+                readingsWs.onclose = () => {
+                    console.log('Readings WebSocket disconnected');
+                    updateStatus('readings-status', 'Disconnected', false);
+                };
+
+                readingsWs.onerror = (error) => {
+                    console.error('Readings WebSocket error:', error);
+                    updateStatus('readings-status', 'Error', false);
+                };
+            }
+
+            // Connect to summary WebSocket
+            if (!summaryWs || summaryWs.readyState === WebSocket.CLOSED) {
+                summaryWs = new WebSocket('ws://localhost:4040/ws/summary');
+
+                summaryWs.onopen = () => {
+                    console.log('Summary WebSocket connected');
+                    updateStatus('summary-status', 'Connected', true);
+                    summaryWs.send(JSON.stringify({ type: 'subscribe' }));
+                };
+
+                summaryWs.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'summary_update') {
+                            currentSummary = data.data;
+                            updateSummaryMetrics();
+                            document.getElementById('update-interval-text').textContent =
+                                `${currentSummary.simulation_interval || 15}s`;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing summary message:', e);
+                    }
+                };
+
+                summaryWs.onclose = () => {
+                    console.log('Summary WebSocket disconnected');
+                    updateStatus('summary-status', 'Disconnected', false);
+                };
+
+                summaryWs.onerror = (error) => {
+                    console.error('Summary WebSocket error:', error);
+                    updateStatus('summary-status', 'Error', false);
+                };
+            }
+        }
+
+        function disconnectWebSockets() {
+            if (readingsWs) {
+                readingsWs.close();
+            }
+            if (summaryWs) {
+                summaryWs.close();
+            }
+        }
+
+        function clearData() {
+            currentReadings = [];
+            currentSummary = {};
+            updateMeterDisplay();
+            updateMetrics();
+            document.getElementById('last-update').textContent = 'Last update: Cleared';
+        }
+
+        function updateMeterDisplay() {
+            const meterGrid = document.getElementById('meter-grid');
+            meterGrid.innerHTML = '';
+
+            document.getElementById('meters-count-text').textContent = currentReadings.length;
+
+            currentReadings.forEach(meter => {
+                const meterCard = document.createElement('div');
+                meterCard.className = `meter-card ${meter.meter_type}`;
+
+                meterCard.innerHTML = `
+                    <div class="meter-header">
+                        <div class="meter-id">${meter.meter_id}</div>
+                        <div class="meter-type ${meter.meter_type}">${meter.meter_type}</div>
+                    </div>
+                    <div class="meter-readings">
+                        <div class="reading">
+                            <span class="reading-label">Building:</span>
+                            <span class="reading-value">${meter.building}</span>
+                        </div>
+                        <div class="reading">
+                            <span class="reading-label">Floor:</span>
+                            <span class="reading-value">${meter.floor}</span>
+                        </div>
+                        <div class="reading">
+                            <span class="reading-label">Consumption:</span>
+                            <span class="reading-value">${meter.energy_consumed.toFixed(2)} kW</span>
+                        </div>
+                        <div class="reading">
+                            <span class="reading-label">Generation:</span>
+                            <span class="reading-value">${meter.energy_generated.toFixed(2)} kW</span>
+                        </div>
+                        <div class="reading">
+                            <span class="reading-label">Grid Feed-in:</span>
+                            <span class="reading-value">${meter.grid_feed_in.toFixed(2)} kW</span>
+                        </div>
+                        <div class="reading">
+                            <span class="reading-label">Battery:</span>
+                            <span class="reading-value">${meter.battery_level || 'N/A'}</span>
+                        </div>
+                        <div class="reading">
+                            <span class="reading-label">Voltage:</span>
+                            <span class="reading-value">${meter.voltage.toFixed(1)} V</span>
+                        </div>
+                        <div class="reading">
+                            <span class="reading-label">Power Factor:</span>
+                            <span class="reading-value">${meter.power_factor.toFixed(2)}</span>
+                        </div>
+                    </div>
+                `;
+
+                meterGrid.appendChild(meterCard);
+            });
+        }
+
+        function updateMetrics() {
+            if (currentReadings.length === 0) return;
+
+            const totalConsumption = currentReadings.reduce((sum, meter) => sum + meter.energy_consumed, 0);
+            const totalGeneration = currentReadings.reduce((sum, meter) => sum + meter.energy_generated, 0);
+            const totalFeedIn = currentReadings.reduce((sum, meter) => sum + meter.grid_feed_in, 0);
+            const netBalance = totalGeneration - totalConsumption;
+
+            document.getElementById('total-consumption').textContent = `${totalConsumption.toFixed(2)} kW`;
+            document.getElementById('total-generation').textContent = `${totalGeneration.toFixed(2)} kW`;
+            document.getElementById('grid-feed-in').textContent = `${totalFeedIn.toFixed(2)} kW`;
+            document.getElementById('net-balance').textContent = `${netBalance.toFixed(2)} kW`;
+        }
+
+        function updateSummaryMetrics() {
+            if (Object.keys(currentSummary).length === 0) return;
+
+            document.getElementById('total-consumption').textContent = `${currentSummary.total_consumption?.toFixed(2) || 0} kW`;
+            document.getElementById('total-generation').textContent = `${currentSummary.total_generation?.toFixed(2) || 0} kW`;
+            document.getElementById('grid-feed-in').textContent = `${currentSummary.total_grid_feed_in?.toFixed(2) || 0} kW`;
+            const netBalance = (currentSummary.total_generation || 0) - (currentSummary.total_consumption || 0);
+            document.getElementById('net-balance').textContent = `${netBalance.toFixed(2)} kW`;
+        }
+
+        // Auto-connect on page load
+        window.onload = () => {
+            setTimeout(connectWebSockets, 1000);
+        };
+
+        // Cleanup on page unload
+        window.onbeforeunload = () => {
+            disconnectWebSockets();
+        };
+    </script>
+</body>
+</html>

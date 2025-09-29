@@ -162,20 +162,69 @@ services:
       dockerfile: ../docker/smart-meter-simulator/Dockerfile
     container_name: p2p-smart-meter-simulator
     depends_on:
-      - postgres
-      - kafka
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      influxdb:
+        condition: service_healthy
     environment:
+      # Simulation Settings
+      SIMULATION_INTERVAL: "15"
+      NUM_METERS: "20"
+      OUTPUT_FILE: "./data/meter_readings.jsonl"
+      
+      # Service Connections
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       DATABASE_URL: "postgresql://p2p_user:p2p_password@postgres:5432/p2p_energy_trading"
-      KAFKA_BROKERS: "kafka:9092"
-      METER_COUNT: "10"
-      SIMULATION_INTERVAL: "60"  # seconds
+      
+      # InfluxDB Configuration
+      INFLUXDB_ENABLED: "true"
+      INFLUXDB_URL: "http://influxdb:8086"
+      INFLUXDB_TOKEN: "gridtokenx-influxdb-token"
+      INFLUXDB_ORG: "gridtokenx"
+      INFLUXDB_BUCKET: "meter_readings_2y"
+      
+      # IEEE 2030.5 Configuration
+      IEEE2030_5_ENABLED: "true"
+      IEEE2030_5_HOST: "0.0.0.0"
+      IEEE2030_5_PORT: "8443"
+      
+      # API Server
+      API_PORT: "4040"
+      
+      # Logging
+      LOG_LEVEL: "INFO"
+      PROMETHEUS_METRICS_ENABLED: "true"
+      
+      # Trading Configuration
+      MIN_SELL_PRICE: "0.15"
+      MAX_SELL_PRICE: "0.35"
+      MIN_BUY_PRICE: "0.20"
+      MAX_BUY_PRICE: "0.40"
+      
+      # Meter Type Distribution
+      SOLAR_PROSUMER_RATIO: "0.40"
+      GRID_CONSUMER_RATIO: "0.35"
+      HYBRID_PROSUMER_RATIO: "0.20"
+      BATTERY_STORAGE_RATIO: "0.05"
     ports:
-      - "4040:4040"
-      - "8443:8443"
-      - "8444:8444"
+      - "4040:4040"  # REST API
+      - "8443:8443"  # IEEE 2030.5 HTTPS
+      - "8444:8444"  # WebSocket
+    volumes:
+      - smart_meter_logs:/app/logs
+      - smart_meter_data:/app/data
+      - smart_meter_certs:/app/certs
     networks:
       - p2p-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4040/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   # API Gateway
   api-gateway:
@@ -289,6 +338,9 @@ volumes:
   zookeeper_logs:
   prometheus_data:
   grafana_data:
+  smart_meter_logs:
+  smart_meter_data:
+  smart_meter_certs:
 
 networks:
   p2p-network:

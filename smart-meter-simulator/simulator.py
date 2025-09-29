@@ -12,10 +12,10 @@ import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 from dataclasses import dataclass, asdict
 import asyncio
-from aiohttp import web
+from aiohttp import web, WSMsgType
 from dotenv import load_dotenv
 
 # InfluxDB imports (optional)
@@ -65,6 +65,7 @@ class MeterReading:
     building: str
     floor: int
     meter_type: str
+    phase_type: str
     energy_consumed: float
     energy_generated: float
     voltage: float
@@ -80,6 +81,75 @@ class MeterReading:
         return asdict(self)
 
 
+class WebSocketManager:
+    """Manages WebSocket connections for real-time data streaming"""
+
+    def __init__(self):
+        self.connections: Set[web.WebSocketResponse] = set()
+        self.logger = logging.getLogger(__name__)
+
+    async def add_connection(self, websocket: web.WebSocketResponse):
+        """Add a new WebSocket connection"""
+        self.connections.add(websocket)
+        self.logger.info(f"WebSocket connection added. Total connections: {len(self.connections)}")
+
+    async def remove_connection(self, websocket: web.WebSocketResponse):
+        """Remove a WebSocket connection"""
+        self.connections.discard(websocket)
+        self.logger.info(f"WebSocket connection removed. Total connections: {len(self.connections)}")
+
+    async def broadcast_readings(self, readings: List[Dict]):
+        """Broadcast meter readings to all connected WebSocket clients"""
+        if not self.connections:
+            return
+
+        message = {
+            "type": "readings_update",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "data": readings
+        }
+
+        # Remove dead connections
+        dead_connections = set()
+        for websocket in self.connections:
+            try:
+                await websocket.send_json(message)
+            except Exception as e:
+                self.logger.warning(f"Failed to send to WebSocket: {e}")
+                dead_connections.add(websocket)
+
+        # Clean up dead connections
+        for dead_ws in dead_connections:
+            self.connections.discard(dead_ws)
+
+        if dead_connections:
+            self.logger.info(f"Cleaned up {len(dead_connections)} dead WebSocket connections")
+
+    async def broadcast_summary(self, summary: Dict):
+        """Broadcast campus summary to all connected WebSocket clients"""
+        if not self.connections:
+            return
+
+        message = {
+            "type": "summary_update",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "data": summary
+        }
+
+        # Remove dead connections
+        dead_connections = set()
+        for websocket in self.connections:
+            try:
+                await websocket.send_json(message)
+            except Exception as e:
+                self.logger.warning(f"Failed to send summary to WebSocket: {e}")
+                dead_connections.add(websocket)
+
+        # Clean up dead connections
+        for dead_ws in dead_connections:
+            self.connections.discard(dead_ws)
+
+
 class SmartMeter:
     """Individual smart meter simulator"""
 
@@ -91,6 +161,7 @@ class SmartMeter:
         self.capacity_kw = meter_config.get("capacity_kw", 100.0)
         self.has_solar = meter_config.get("solar_installed", False)
         self.has_battery = meter_config.get("battery_storage", False)
+        self.phase_type = meter_config.get("phase_type", "single-phase")
 
         # Simulation state
         self.battery_level = 50.0 if self.has_battery else None
@@ -99,7 +170,7 @@ class SmartMeter:
 
         logger.info(
             f"Initialized meter {self.meter_id} - Type: {self.meter_type}, "
-            f"Solar: {self.has_solar}, Battery: {self.has_battery}"
+            f"Phase: {self.phase_type}, Solar: {self.has_solar}, Battery: {self.has_battery}"
         )
 
     def generate_reading(self) -> MeterReading:
@@ -152,6 +223,7 @@ class SmartMeter:
             building=self.building,
             floor=self.floor,
             meter_type=self.meter_type,
+            phase_type=self.phase_type,
             energy_consumed=round(consumption, 2),
             energy_generated=round(generation, 2),
             voltage=230 + random.uniform(-5, 5),
@@ -181,6 +253,9 @@ class CampusNetworkSimulator:
         self.is_running = False
         self.readings_buffer: List[Dict] = []
         self.api_server = None
+
+        # Initialize WebSocket manager
+        self.websocket_manager = WebSocketManager()
 
         # Initialize InfluxDB client
         self.influx_client = None
@@ -318,13 +393,26 @@ class CampusNetworkSimulator:
                     device_lfdi=device_lfdi
                 )
 
-                # Register device with server
-                if client.register_device(device_info):
-                    client.register_mirror_usage_point(meter_config)
-                    self.ieee2030_5_clients[meter_id] = client
-                    logger.info(f"✅ IEEE 2030.5 client registered for meter {meter_id}")
-                else:
-                    logger.warning(f"❌ Failed to register IEEE 2030.5 client for meter {meter_id}")
+                # Register device with server - add retry logic
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        logger.info(f"Attempting to register IEEE 2030.5 client for meter {meter_id} (attempt {attempt + 1}/{max_retries})")
+                        if client.register_device(device_info):
+                            client.register_mirror_usage_point(meter_config)
+                            self.ieee2030_5_clients[meter_id] = client
+                            logger.info(f"✅ IEEE 2030.5 client registered for meter {meter_id}")
+                            break
+                        else:
+                            logger.warning(f"❌ Failed to register IEEE 2030.5 client for meter {meter_id} (attempt {attempt + 1})")
+                            if attempt < max_retries - 1:
+                                await asyncio.sleep(2)  # Wait before retry
+                    except Exception as e:
+                        logger.error(f"❌ Exception during IEEE 2030.5 client registration for meter {meter_id} (attempt {attempt + 1}): {e}")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(2)  # Wait before retry
+                        else:
+                            logger.error(f"❌ Failed to register IEEE 2030.5 client for meter {meter_id} after {max_retries} attempts")
 
             logger.info(f"IEEE 2030.5 client registration complete: {len(self.ieee2030_5_clients)} clients connected")
 
@@ -347,6 +435,7 @@ class CampusNetworkSimulator:
                     .tag("building", reading["building"])
                     .tag("floor", str(reading["floor"]))
                     .tag("meter_type", reading["meter_type"])
+                    .tag("phase_type", reading["phase_type"])
                     .field("energy_consumed", reading["energy_consumed"])
                     .field("energy_generated", reading["energy_generated"])
                     .field("voltage", reading["voltage"])
@@ -404,6 +493,32 @@ class CampusNetworkSimulator:
             # Store in buffer
             self.readings_buffer = readings
 
+            # Broadcast readings via WebSocket
+            await self.websocket_manager.broadcast_readings(readings)
+
+            # Generate and broadcast campus summary
+            if readings:
+                summary = {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "campus": self.config["campus"]["name"],
+                    "total_meters": len(self.meters),
+                    "total_consumption": sum(r["energy_consumed"] for r in readings),
+                    "total_generation": sum(r["energy_generated"] for r in readings),
+                    "total_grid_feed_in": sum(r["grid_feed_in"] for r in readings),
+                    "prosumer_count": sum(1 for m in self.meters if m.meter_type == "prosumer"),
+                    "consumer_count": sum(1 for m in self.meters if m.meter_type == "consumer"),
+                    "three_phase_count": sum(1 for m in self.meters if m.phase_type == "3-phase"),
+                    "single_phase_count": sum(1 for m in self.meters if m.phase_type == "single-phase"),
+                    "meters_with_solar": sum(1 for m in self.meters if m.has_solar),
+                    "meters_with_battery": sum(1 for m in self.meters if m.has_battery),
+                    "average_battery_level": sum(
+                        m.battery_level for m in self.meters if m.battery_level
+                    ) / sum(1 for m in self.meters if m.battery_level)
+                    if any(m.battery_level for m in self.meters)
+                    else 0,
+                }
+                await self.websocket_manager.broadcast_summary(summary)
+
             # Always attempt to send to InfluxDB (data persistence is critical)
             try:
                 await self._send_to_influxdb(readings)
@@ -419,7 +534,8 @@ class CampusNetworkSimulator:
             logger.info(
                 f"Campus Summary - Consumption: {total_consumption:.2f} kW, "
                 f"Generation: {total_generation:.2f} kW, "
-                f"Grid Feed-in: {total_feed_in:.2f} kW"
+                f"Grid Feed-in: {total_feed_in:.2f} kW, "
+                f"WebSocket Clients: {len(self.websocket_manager.connections)}"
             )
 
             # Wait for next collection cycle
@@ -446,6 +562,7 @@ class CampusNetworkSimulator:
                     "building": meter.building,
                     "floor": meter.floor,
                     "type": meter.meter_type,
+                    "phase_type": meter.phase_type,
                     "capacity_kw": meter.capacity_kw,
                     "has_solar": meter.has_solar,
                     "has_battery": meter.has_battery,
@@ -486,6 +603,8 @@ class CampusNetworkSimulator:
             "total_grid_feed_in": sum(r["grid_feed_in"] for r in self.readings_buffer),
             "prosumer_count": sum(1 for m in self.meters if m.meter_type == "prosumer"),
             "consumer_count": sum(1 for m in self.meters if m.meter_type == "consumer"),
+            "three_phase_count": sum(1 for m in self.meters if m.phase_type == "3-phase"),
+            "single_phase_count": sum(1 for m in self.meters if m.phase_type == "single-phase"),
             "meters_with_solar": sum(1 for m in self.meters if m.has_solar),
             "meters_with_battery": sum(1 for m in self.meters if m.has_battery),
             "average_battery_level": sum(
@@ -528,6 +647,113 @@ class CampusNetworkSimulator:
 
         return web.json_response({"clients": clients_info})
 
+    async def handle_websocket_readings(self, request):
+        """WebSocket endpoint for real-time meter readings"""
+        websocket = web.WebSocketResponse()
+        await websocket.prepare(request)
+
+        logger.info("New WebSocket connection for readings")
+        await self.websocket_manager.add_connection(websocket)
+
+        try:
+            async for msg in websocket:
+                if msg.type == WSMsgType.TEXT:
+                    try:
+                        data = json.loads(msg.data)
+                        if data.get("type") == "ping":
+                            await websocket.send_json({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+                        elif data.get("type") == "subscribe":
+                            # Send current readings immediately upon subscription
+                            if self.readings_buffer:
+                                await websocket.send_json({
+                                    "type": "readings_update",
+                                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                                    "data": self.readings_buffer
+                                })
+                            await websocket.send_json({
+                                "type": "subscribed",
+                                "message": "Successfully subscribed to real-time readings",
+                                "meters_count": len(self.meters),
+                                "update_interval": self.simulation_interval
+                            })
+                    except json.JSONDecodeError:
+                        await websocket.send_json({"type": "error", "message": "Invalid JSON format"})
+                elif msg.type == WSMsgType.ERROR:
+                    logger.error(f"WebSocket error: {websocket.exception()}")
+        except Exception as e:
+            logger.error(f"WebSocket connection error: {e}")
+        finally:
+            await self.websocket_manager.remove_connection(websocket)
+
+        return websocket
+
+    async def handle_websocket_summary(self, request):
+        """WebSocket endpoint for real-time campus summary"""
+        websocket = web.WebSocketResponse()
+        await websocket.prepare(request)
+
+        logger.info("New WebSocket connection for summary")
+        await self.websocket_manager.add_connection(websocket)
+
+        try:
+            async for msg in websocket:
+                if msg.type == WSMsgType.TEXT:
+                    try:
+                        data = json.loads(msg.data)
+                        if data.get("type") == "ping":
+                            await websocket.send_json({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+                        elif data.get("type") == "subscribe":
+                            # Send current summary immediately upon subscription
+                            if self.readings_buffer:
+                                summary = {
+                                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                                    "campus": self.config["campus"]["name"],
+                                    "total_meters": len(self.meters),
+                                    "total_consumption": sum(r["energy_consumed"] for r in self.readings_buffer),
+                                    "total_generation": sum(r["energy_generated"] for r in self.readings_buffer),
+                                    "total_grid_feed_in": sum(r["grid_feed_in"] for r in self.readings_buffer),
+                                    "prosumer_count": sum(1 for m in self.meters if m.meter_type == "prosumer"),
+                                    "consumer_count": sum(1 for m in self.meters if m.meter_type == "consumer"),
+                                    "three_phase_count": sum(1 for m in self.meters if m.phase_type == "3-phase"),
+                                    "single_phase_count": sum(1 for m in self.meters if m.phase_type == "single-phase"),
+                                    "meters_with_solar": sum(1 for m in self.meters if m.has_solar),
+                                    "meters_with_battery": sum(1 for m in self.meters if m.has_battery),
+                                    "average_battery_level": sum(
+                                        m.battery_level for m in self.meters if m.battery_level
+                                    ) / sum(1 for m in self.meters if m.battery_level)
+                                    if any(m.battery_level for m in self.meters)
+                                    else 0,
+                                }
+                                await websocket.send_json({
+                                    "type": "summary_update",
+                                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                                    "data": summary
+                                })
+                            await websocket.send_json({
+                                "type": "subscribed",
+                                "message": "Successfully subscribed to real-time summary",
+                                "update_interval": self.simulation_interval
+                            })
+                    except json.JSONDecodeError:
+                        await websocket.send_json({"type": "error", "message": "Invalid JSON format"})
+                elif msg.type == WSMsgType.ERROR:
+                    logger.error(f"WebSocket error: {websocket.exception()}")
+        except Exception as e:
+            logger.error(f"WebSocket connection error: {e}")
+        finally:
+            await self.websocket_manager.remove_connection(websocket)
+
+        return websocket
+
+    async def handle_websocket_status(self, request):
+        """Get WebSocket connection status"""
+        return web.json_response({
+            "websocket_enabled": True,
+            "active_connections": len(self.websocket_manager.connections),
+            "simulation_interval": self.simulation_interval,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+
     async def setup_api_server(self, app):
         """Setup API routes"""
         app.router.add_get("/health", self.handle_health)
@@ -535,6 +761,11 @@ class CampusNetworkSimulator:
         app.router.add_get("/api/readings", self.handle_readings)
         app.router.add_get("/api/meters/{meter_id}/reading", self.handle_meter_reading)
         app.router.add_get("/api/campus/summary", self.handle_campus_summary)
+
+        # WebSocket endpoints for real-time data
+        app.router.add_get("/ws/readings", self.handle_websocket_readings)
+        app.router.add_get("/ws/summary", self.handle_websocket_summary)
+        app.router.add_get("/api/websocket/status", self.handle_websocket_status)
 
         # IEEE 2030.5 endpoints (if enabled)
         if self.ieee2030_5_enabled:
@@ -595,6 +826,21 @@ class CampusNetworkSimulator:
                 <a href="{base_url}/api/campus/summary" class="path">/api/campus/summary</a> 
                 <span class="description">- Campus energy summary</span>
             </div>
+            <div class="endpoint">
+                <span class="method">WS</span> 
+                <span class="path">/ws/readings</span> 
+                <span class="description">- Real-time meter readings via WebSocket</span>
+            </div>
+            <div class="endpoint">
+                <span class="method">WS</span> 
+                <span class="path">/ws/summary</span> 
+                <span class="description">- Real-time campus summary via WebSocket</span>
+            </div>
+            <div class="endpoint">
+                <span class="method">GET</span> 
+                <a href="{base_url}/api/websocket/status" class="path">/api/websocket/status</a> 
+                <span class="description">- WebSocket connection status</span>
+            </div>
             {f'''
             <div class="endpoint">
                 <span class="method">GET</span> 
@@ -611,6 +857,7 @@ class CampusNetworkSimulator:
             <h2>Status:</h2>
             <p>✅ Simulator is running</p>
             <p>📊 Collecting readings every {self.simulation_interval} seconds</p>
+            <p>🔌 WebSocket: Enabled ({len(self.websocket_manager.connections)} active connections)</p>
             <p>💾 InfluxDB: {'Enabled' if self.write_api else 'Disabled'}</p>
             {f'<p>🔌 IEEE 2030.5: Enabled (Port {getattr(self.ieee2030_5_server, "port", "N/A")})</p>' if self.ieee2030_5_enabled else '<p>ℹ️ IEEE 2030.5: Disabled</p>'}
         </body>
@@ -632,11 +879,30 @@ class CampusNetworkSimulator:
                 await self.ieee2030_5_server.start_background()
                 logger.info(f"IEEE 2030.5 server started on port {self.ieee2030_5_server.port}")
 
-                # Wait a moment for server to be fully ready
-                await asyncio.sleep(2)
+                # Wait longer for server to be fully ready and listening
+                logger.info("Waiting for IEEE 2030.5 server to be ready...")
+                await asyncio.sleep(5)
 
-                # Now register clients after server is running
-                await self._register_ieee2030_5_clients()
+                # Verify server is actually running by checking if we can connect
+                import socket
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                try:
+                    result = sock.connect_ex(('localhost', self.ieee2030_5_server.port))
+                    if result == 0:
+                        logger.info("✅ IEEE 2030.5 server is listening and ready")
+                        # Skip client registration for now due to timeout issues
+                        logger.warning("⚠️ Skipping IEEE 2030.5 client registration due to server response issues")
+                        logger.info("IEEE 2030.5 server is running - clients can connect manually if needed")
+                    else:
+                        logger.warning("⚠️ IEEE 2030.5 server may not be fully ready yet")
+                except Exception as e:
+                    logger.warning(f"Could not verify server status: {e}")
+                finally:
+                    sock.close()
+
+                # Skip client registration for now - server is running
+                # await self._register_ieee2030_5_clients()
 
             except Exception as e:
                 logger.error(f"Failed to start IEEE 2030.5 server: {e}")
@@ -662,11 +928,12 @@ class CampusNetworkSimulator:
         print(f"✅ Simulator started successfully!")
         print(f"📊 Managing {len(self.meters)} smart meters")
         print(f"🌐 API Server: http://localhost:{self.api_port}")
-        print(f"📈 Collecting readings every {self.simulation_interval} seconds")
+        print(f"� WebSocket: Enabled (ws://localhost:{self.api_port}/ws/readings)")
+        print(f"�📈 Collecting readings every {self.simulation_interval} seconds")
         print(f"💾 InfluxDB Storage: {'Enabled' if self.write_api else 'Disabled'}")
         if self.ieee2030_5_enabled:
             print(f"IEEE 2030.5 Server: http://localhost:{getattr(self.ieee2030_5_server, 'port', 'N/A')}")
-            print(f"IEEE 2030.5 Clients: {len(self.ieee2030_5_clients)} connected")
+            print(f"IEEE 2030.5 Clients: Registration skipped (server running)")
         else:
             print("ℹIEEE 2030.5: Disabled")
         print(f"Logs: logs/simulator.log")

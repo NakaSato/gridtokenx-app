@@ -75,7 +75,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8443/health', timeout=5)" || exit 1
+    CMD curl -f http://localhost:4040/health || exit 1
 
 # Switch to non-root user
 USER meter
@@ -87,4 +87,4 @@ EXPOSE 4040 8443 8444
 ENTRYPOINT ["tini", "--"]
 
 # Default command - can be overridden
-CMD ["python", "campus_network_deployment.py", "--config-file", "config/utcc_campus_config.json"]
+CMD ["python", "simulator.py"]

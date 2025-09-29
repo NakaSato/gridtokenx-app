@@ -1,6 +1,6 @@
 {
   "version": "3",
-  "serial_number": "cbc68b56-fe52-4966-8854-6f086a9f4a02",
+  "serial_number": "2c94c17c-df1d-43f6-a80a-f64131549a93",
   "subject": {
     "common_name": "LFDI_AMI_METER_UTCC_002",
     "organization": "UTCC University",
@@ -10,10 +10,10 @@
     "locality": "Bangkok"
   },
   "issuer": "GridTokenX UTCC Root CA",
-  "not_before": "2025-09-29T17:13:48.346659",
-  "not_after": "2026-09-29T17:13:48.346699",
+  "not_before": "2025-09-29T17:27:21.370510",
+  "not_after": "2026-09-29T17:27:21.370537",
   "public_key": "simulated_rsa_key_2048_LFDI_AMI_METER_UTCC_002",
-  "signature": "simulated_signature_sha256_e1c32bd7-bf85-407c-ab07-98c48a4a851d",
+  "signature": "simulated_signature_sha256_54f72c96-bf6a-45f4-b71d-72b26e9ea73e",
   "extensions": {
     "key_usage": [
       "digital_signature",
@@ -22,7 +22,7 @@
     "extended_key_usage": [
       "client_auth"
     ],
-    "subject_key_identifier": "ski_f8f604bc-a762-45f7-aa5f-05c669c6fae6",
-    "authority_key_identifier": "aki_82632f49-2352-429a-8068-63331500f008"
+    "subject_key_identifier": "ski_4b88fb63-dd10-45ef-b5ff-f78df4c34666",
+    "authority_key_identifier": "aki_9566a546-ff75-4b49-981b-f86868aa5820"
   }
 }

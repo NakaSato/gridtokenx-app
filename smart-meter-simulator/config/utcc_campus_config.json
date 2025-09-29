@@ -45,7 +45,8 @@
       "type": "prosumer",
       "capacity_kw": 150.0,
       "solar_installed": true,
-      "battery_storage": true
+      "battery_storage": true,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_002",
@@ -54,7 +55,8 @@
       "type": "consumer",
       "capacity_kw": 120.0,
       "solar_installed": false,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_003",
@@ -63,7 +65,8 @@
       "type": "prosumer",
       "capacity_kw": 140.0,
       "solar_installed": true,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_004",
@@ -72,7 +75,8 @@
       "type": "prosumer",
       "capacity_kw": 160.0,
       "solar_installed": true,
-      "battery_storage": true
+      "battery_storage": true,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_005",
@@ -81,7 +85,8 @@
       "type": "consumer",
       "capacity_kw": 110.0,
       "solar_installed": false,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_006",
@@ -90,7 +95,8 @@
       "type": "prosumer",
       "capacity_kw": 180.0,
       "solar_installed": true,
-      "battery_storage": true
+      "battery_storage": true,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_007",
@@ -99,7 +105,8 @@
       "type": "consumer",
       "capacity_kw": 130.0,
       "solar_installed": false,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_008",
@@ -108,7 +115,8 @@
       "type": "prosumer",
       "capacity_kw": 145.0,
       "solar_installed": true,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "single-phase"
     },
     {
       "id": "AMI_METER_UTCC_009",
@@ -117,7 +125,8 @@
       "type": "consumer",
       "capacity_kw": 200.0,
       "solar_installed": false,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_010",
@@ -126,7 +135,8 @@
       "type": "prosumer",
       "capacity_kw": 175.0,
       "solar_installed": true,
-      "battery_storage": true
+      "battery_storage": true,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_011",
@@ -135,7 +145,8 @@
       "type": "consumer",
       "capacity_kw": 100.0,
       "solar_installed": false,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_012",
@@ -144,7 +155,8 @@
       "type": "prosumer",
       "capacity_kw": 90.0,
       "solar_installed": true,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_013",
@@ -153,7 +165,8 @@
       "type": "prosumer",
       "capacity_kw": 250.0,
       "solar_installed": true,
-      "battery_storage": true
+      "battery_storage": true,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_014",
@@ -162,7 +175,8 @@
       "type": "consumer",
       "capacity_kw": 180.0,
       "solar_installed": false,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "single-phase"
     },
     {
       "id": "AMI_METER_UTCC_015",
@@ -171,7 +185,8 @@
       "type": "consumer",
       "capacity_kw": 120.0,
       "solar_installed": false,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "single-phase"
     },
     {
       "id": "AMI_METER_UTCC_016",
@@ -180,7 +195,8 @@
       "type": "prosumer",
       "capacity_kw": 135.0,
       "solar_installed": true,
-      "battery_storage": true
+      "battery_storage": true,
+      "phase_type": "single-phase"
     },
     {
       "id": "AMI_METER_UTCC_017",
@@ -189,7 +205,8 @@
       "type": "prosumer",
       "capacity_kw": 300.0,
       "solar_installed": true,
-      "battery_storage": true
+      "battery_storage": true,
+      "phase_type": "single-phase"
     },
     {
       "id": "AMI_METER_UTCC_018",
@@ -198,7 +215,8 @@
       "type": "prosumer",
       "capacity_kw": 280.0,
       "solar_installed": true,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_019",
@@ -207,7 +225,8 @@
       "type": "prosumer",
       "capacity_kw": 290.0,
       "solar_installed": true,
-      "battery_storage": true
+      "battery_storage": true,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_020",
@@ -216,7 +235,8 @@
       "type": "consumer",
       "capacity_kw": 260.0,
       "solar_installed": false,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "single-phase"
     },
     {
       "id": "AMI_METER_UTCC_021",
@@ -225,7 +245,8 @@
       "type": "prosumer",
       "capacity_kw": 220.0,
       "solar_installed": true,
-      "battery_storage": true
+      "battery_storage": true,
+      "phase_type": "single-phase"
     },
     {
       "id": "AMI_METER_UTCC_022",
@@ -234,7 +255,8 @@
       "type": "consumer",
       "capacity_kw": 400.0,
       "solar_installed": false,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "3-phase"
     },
     {
       "id": "AMI_METER_UTCC_023",
@@ -243,7 +265,8 @@
       "type": "prosumer",
       "capacity_kw": 100.0,
       "solar_installed": true,
-      "battery_storage": true
+      "battery_storage": true,
+      "phase_type": "single-phase"
     },
     {
       "id": "AMI_METER_UTCC_024",
@@ -252,7 +275,8 @@
       "type": "consumer",
       "capacity_kw": 80.0,
       "solar_installed": false,
-      "battery_storage": false
+      "battery_storage": false,
+      "phase_type": "single-phase"
     },
     {
       "id": "AMI_METER_UTCC_025",
@@ -261,7 +285,8 @@
       "type": "prosumer",
       "capacity_kw": 320.0,
       "solar_installed": true,
-      "battery_storage": true
+      "battery_storage": true,
+      "phase_type": "single-phase"
     }
   ],
   "database": {
