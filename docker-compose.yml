@@ -149,6 +149,10 @@ services:
       KAFKA_BROKERS: "kafka:9092"
       METER_COUNT: "10"
       SIMULATION_INTERVAL: "60"  # seconds
+    ports:
+      - "4040:4040"
+      - "8443:8443"
+      - "8444:8444"
     networks:
       - p2p-network
     restart: unless-stopped

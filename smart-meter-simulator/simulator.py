@@ -10,6 +10,7 @@ import time
 import random
 import logging
 import threading
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -17,10 +18,14 @@ from dataclasses import dataclass, field, asdict
 import asyncio
 import aiohttp
 from aiohttp import web
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, os.getenv("LOG_LEVEL", "INFO")),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler(), logging.FileHandler("logs/simulator.log")],
 )
@@ -179,7 +184,7 @@ class CampusNetworkSimulator:
             meter = SmartMeter(meter_config)
             self.meters.append(meter)
 
-    async def collect_readings(self):
+    async def collect_readings(self, simulation_interval: int = 15):
         """Collect readings from all meters periodically"""
         while self.is_running:
             readings = []
@@ -201,8 +206,8 @@ class CampusNetworkSimulator:
                 f"Grid Feed-in: {total_feed_in:.2f} kW"
             )
 
-            # Wait for next collection cycle (15 seconds by default)
-            await asyncio.sleep(15)
+            # Wait for next collection cycle
+            await asyncio.sleep(simulation_interval)
 
     async def handle_health(self, request):
         """Health check endpoint"""
@@ -290,17 +295,17 @@ class CampusNetworkSimulator:
 
     async def handle_index(self, request):
         """Simple index page with API documentation"""
-        html_content = """
+        html_content = f"""
         <!DOCTYPE html>
         <html>
         <head>
             <title>UTCC GridTokenX Smart Meter Simulator</title>
             <style>
-                body { font-family: Arial, sans-serif; margin: 40px; }
-                h1 { color: #2c3e50; }
-                .endpoint { background: #f4f4f4; padding: 10px; margin: 10px 0; border-radius: 5px; }
-                .method { color: #27ae60; font-weight: bold; }
-                .path { color: #2980b9; font-family: monospace; }
+                body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                h1 {{ color: #2c3e50; }}
+                .endpoint {{ background: #f4f4f4; padding: 10px; margin: 10px 0; border-radius: 5px; }}
+                .method {{ color: #27ae60; font-weight: bold; }}
+                .path {{ color: #2980b9; font-family: monospace; }}
             </style>
         </head>
         <body>
@@ -318,7 +323,7 @@ class CampusNetworkSimulator:
                 <span class="method">GET</span> <span class="path">/api/readings</span> - Get latest readings
             </div>
             <div class="endpoint">
-                <span class="method">GET</span> <span class="path">/api/meters/{meter_id}/reading</span> - Get specific meter reading
+                <span class="method">GET</span> <span class="path">/api/meters/{{meter_id}}/reading</span> - Get specific meter reading
             </div>
             <div class="endpoint">
                 <span class="method">GET</span> <span class="path">/api/campus/summary</span> - Campus energy summary
@@ -326,7 +331,7 @@ class CampusNetworkSimulator:
 
             <h2>Status:</h2>
             <p>✅ Simulator is running</p>
-            <p>📊 Collecting readings every 15 seconds</p>
+            <p>📊 Collecting readings every {self.simulation_interval} seconds</p>
         </body>
         </html>
         """
@@ -336,18 +341,22 @@ class CampusNetworkSimulator:
         """Start the campus network simulator"""
         self.is_running = True
 
+        # Load configuration from environment
+        self.api_port = int(os.getenv("API_PORT", "4040"))
+        self.simulation_interval = int(os.getenv("SIMULATION_INTERVAL", "15"))
+
         # Create web application
         app = web.Application()
         await self.setup_api_server(app)
 
         # Start reading collection task
-        asyncio.create_task(self.collect_readings())
+        asyncio.create_task(self.collect_readings(self.simulation_interval))
 
         # Start web server
-        logger.info("Starting API server on http://0.0.0.0:8080")
+        logger.info(f"Starting API server on http://0.0.0.0:{self.api_port}")
         runner = web.AppRunner(app)
         await runner.setup()
-        site = web.TCPSite(runner, "0.0.0.0", 8080)
+        site = web.TCPSite(runner, "0.0.0.0", self.api_port)
         await site.start()
 
         print("\n" + "=" * 60)
@@ -355,8 +364,8 @@ class CampusNetworkSimulator:
         print("=" * 60)
         print(f"✅ Simulator started successfully!")
         print(f"📊 Managing {len(self.meters)} smart meters")
-        print(f"🌐 API Server: http://localhost:8080")
-        print(f"📈 Collecting readings every 15 seconds")
+        print(f"🌐 API Server: http://localhost:{self.api_port}")
+        print(f"📈 Collecting readings every {self.simulation_interval} seconds")
         print(f"📝 Logs: logs/simulator.log")
         print("\nPress Ctrl+C to stop the simulator")
         print("=" * 60 + "\n")

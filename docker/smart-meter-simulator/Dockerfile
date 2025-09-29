@@ -1,7 +1,4 @@
-# GridTokenX UTCC University Campus Network - Smart Meter Simulator
-# Multi-stage Dockerfile for IEEE 2030.5-2018 Smart Energy Profile 2.0
-# Optimized for 25-meter UTCC campus deployment
-
+# Use multi-stage builds for smaller final image size
 # Stage 1: Build Environment
 FROM python:3.12-slim as builder
 
@@ -9,7 +6,7 @@ FROM python:3.12-slim as builder
 ARG BUILD_VERSION="1.0.0"
 ARG BUILD_DATE
 ARG VCS_REF
-LABEL maintainer="GridTokenX Team" \
+LABEL maintainer="meter Team" \
       version="${BUILD_VERSION}" \
       description="UTCC University IEEE 2030.5 Campus Network Simulator" \
       build-date="${BUILD_DATE}" \
@@ -52,7 +49,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean
 
 # Create non-root user for security
-RUN groupadd -r gridtokenx && useradd -r -g gridtokenx -s /bin/bash gridtokenx
+RUN groupadd -r meter && useradd -r -g meter -s /bin/bash meter
 
 # Set working directory
 WORKDIR /app
@@ -60,11 +57,11 @@ WORKDIR /app
 # Copy Python virtual environment and application code from builder stage
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app /app
-RUN chown -R gridtokenx:gridtokenx /app
+RUN chown -R meter:meter /app
 
 # Create necessary directories with proper permissions
 RUN mkdir -p logs certs/ca certs/meters data && \
-    chown -R gridtokenx:gridtokenx /app
+    chown -R meter:meter /app
 
 # Set environment variables
 ENV PATH="/app/.venv/bin:$PATH" \
@@ -81,10 +78,10 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8443/health', timeout=5)" || exit 1
 
 # Switch to non-root user
-USER gridtokenx
+USER meter
 
-# Expose ports
-EXPOSE 8080 8443 8444
+# Expose ports for HTTP, HTTPS, and gRPC/other
+EXPOSE 4040 8443 8444
 
 # Use tini as init system
 ENTRYPOINT ["tini", "--"]
