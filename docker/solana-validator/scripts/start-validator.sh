@@ -40,15 +40,12 @@ log "Configuration complete. Starting test validator..."
 # Start the test validator with optimized settings for development
 exec solana-test-validator \
     --ledger "$LEDGER_PATH" \
-    --identity "$VALIDATOR_KEYPAIR" \
-    --faucet-keypair "$FAUCET_KEYPAIR" \
-    --rpc-bind-address 0.0.0.0 \
+    --bind-address 0.0.0.0 \
     --rpc-port 8899 \
     --gossip-port 8001 \
     --dynamic-port-range 8002-8020 \
-    --log "$LOG_PATH/validator.log" \
+    --log \
     --reset \
-    --quiet \
     --slots-per-epoch 32 \
     --faucet-sol 10000000 \
     --compute-unit-limit 1000000 \

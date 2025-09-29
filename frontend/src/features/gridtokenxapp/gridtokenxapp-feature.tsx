@@ -30,7 +30,7 @@ export default function GridtokenxappFeature() {
           </div>
         )}
       </AppHero>
-      {account ? <GridtokenxappUiList account={account} /> : null}
+      {account ? <GridtokenxappUiList /> : null}
     </GridtokenxappUiProgramGuard>
   )
 }

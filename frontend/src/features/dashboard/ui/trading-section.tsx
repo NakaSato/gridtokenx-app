@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,7 +15,7 @@ import { useTradingData } from '../data-access/use-trading-data'
 import { useBuyEnergyMutation, useSellEnergyMutation } from '../data-access/use-trading-mutations'
 import { BuyConfirmationModal, SellModal } from './trading-modals'
 import { TransactionStatusList, useTransactionStatusManager } from './transaction-status'
-import { LivePriceDisplay, usePriceTracking } from './price-indicators'
+// import { LivePriceDisplay, usePriceTracking } from './price-indicators'
 
 interface TradingSectionProps {
   onBuy?: (opportunityId: string, quantity: number) => Promise<void>
@@ -46,10 +46,10 @@ export function TradingSection({ onBuy, onSell }: TradingSectionProps) {
   
   // Real-time features
   const transactionManager = useTransactionStatusManager()
-  const solarPricing = usePriceTracking(0.08)
-  const windPricing = usePriceTracking(0.06)
-  const batteryPricing = usePriceTracking(0.12)
-  const gridPricing = usePriceTracking(0.10)
+  // const solarPricing = usePriceTracking(0.08)
+  // const windPricing = usePriceTracking(0.06)
+  // const batteryPricing = usePriceTracking(0.12)
+  // const gridPricing = usePriceTracking(0.10)
   
   // Filter and sort state
   const [filters, setFilters] = useState<TradingFilters>({
@@ -70,19 +70,19 @@ export function TradingSection({ onBuy, onSell }: TradingSectionProps) {
   const [selectedOpportunity, setSelectedOpportunity] = useState<TradingOpportunity | null>(null)
   
   // Real-time price updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Simulate price fluctuations
-      const fluctuation = () => (Math.random() - 0.5) * 0.002 // ±0.1% change
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     // Simulate price fluctuations
+  //     const fluctuation = () => (Math.random() - 0.5) * 0.002 // ±0.1% change
       
-      solarPricing.updatePrice(solarPricing.currentPrice + fluctuation())
-      windPricing.updatePrice(windPricing.currentPrice + fluctuation())
-      batteryPricing.updatePrice(batteryPricing.currentPrice + fluctuation())
-      gridPricing.updatePrice(gridPricing.currentPrice + fluctuation())
-    }, 5000) // Update every 5 seconds
+  //     solarPricing.updatePrice(solarPricing.currentPrice + fluctuation())
+  //     windPricing.updatePrice(windPricing.currentPrice + fluctuation())
+  //     batteryPricing.updatePrice(batteryPricing.currentPrice + fluctuation())
+  //     gridPricing.updatePrice(gridPricing.currentPrice + fluctuation())
+  //   }, 5000) // Update every 5 seconds
     
-    return () => clearInterval(interval)
-  }, [solarPricing, windPricing, batteryPricing, gridPricing])
+  //   return () => clearInterval(interval)
+  // }, [solarPricing, windPricing, batteryPricing, gridPricing])
   
   // Filter and sort opportunities
   const filteredAndSortedOpportunities = useMemo(() => {
@@ -284,7 +284,7 @@ export function TradingSection({ onBuy, onSell }: TradingSectionProps) {
         </CardHeader>
       <CardContent className="space-y-6">
         {/* Live Market Prices */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+        {/* <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
           <LivePriceDisplay
             energyType="solar"
             currentPrice={solarPricing.currentPrice}
@@ -313,7 +313,7 @@ export function TradingSection({ onBuy, onSell }: TradingSectionProps) {
             trend={gridPricing.trend}
             lastUpdated={Date.now()}
           />
-        </div>
+        </div> */}
         
         {/* Transaction Status */}
         {transactionManager.transactions.length > 0 && (

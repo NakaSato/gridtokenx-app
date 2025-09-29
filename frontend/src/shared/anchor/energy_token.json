@@ -1,0 +1,266 @@
+{
+  "address": "GizasjPBdHw9tkme1jwpVSsa14USHBaYDCuRqziUdfaa",
+  "metadata": {
+    "name": "energy_token",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Energy Token program for P2P Energy Trading - SPL token wrapper"
+  },
+  "instructions": [
+    {
+      "name": "add_rec_validator",
+      "docs": [
+        "Add a REC validator to the system"
+      ],
+      "discriminator": [
+        73,
+        235,
+        183,
+        190,
+        157,
+        85,
+        246,
+        2
+      ],
+      "accounts": [
+        {
+          "name": "token_info",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "token_info"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_pubkey",
+          "type": "pubkey"
+        },
+        {
+          "name": "authority_name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "burn_tokens",
+      "docs": [
+        "Burn energy tokens (for energy consumption)"
+      ],
+      "discriminator": [
+        76,
+        15,
+        51,
+        254,
+        229,
+        215,
+        121,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "token_info",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "token_account",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_token",
+      "docs": [
+        "Initialize the energy token program"
+      ],
+      "discriminator": [
+        38,
+        209,
+        150,
+        50,
+        190,
+        117,
+        16,
+        54
+      ],
+      "accounts": [
+        {
+          "name": "token_info",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  105,
+                  110,
+                  102,
+                  111
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transfer_tokens",
+      "docs": [
+        "Transfer energy tokens between accounts"
+      ],
+      "discriminator": [
+        54,
+        180,
+        238,
+        175,
+        74,
+        85,
+        126,
+        188
+      ],
+      "accounts": [
+        {
+          "name": "from_token_account",
+          "writable": true
+        },
+        {
+          "name": "to_token_account",
+          "writable": true
+        },
+        {
+          "name": "from_authority",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "TokenInfo",
+      "discriminator": [
+        109,
+        162,
+        52,
+        125,
+        77,
+        166,
+        37,
+        202
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "UnauthorizedAuthority",
+      "msg": "Unauthorized authority"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidMeter",
+      "msg": "Invalid meter"
+    },
+    {
+      "code": 6002,
+      "name": "InsufficientBalance",
+      "msg": "Insufficient token balance"
+    }
+  ],
+  "types": [
+    {
+      "name": "TokenInfo",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_supply",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}

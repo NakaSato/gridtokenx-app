@@ -18,7 +18,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
-      '@project/anchor': resolve(__dirname, '../anchor/src/gridtokenxapp-exports'),
+      '@project/anchor': resolve(__dirname, './src/shared/anchor/gridtokenxapp-exports'),
+    },
+  },
+  build: {
+    rollupOptions: {
+      external: ['gill'],
     },
   },
   test: {

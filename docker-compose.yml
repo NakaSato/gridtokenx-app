@@ -1,14 +1,13 @@
 services:
-  # Smart Contract Deployment Service - OPTIMIZED
+  # Smart Contract Deployment Service
   contact:
     build:
       context: ./docker/contact
       dockerfile: Dockerfile
     container_name: p2p-contact
-    # Temporarily disabled validator dependency due to platform issues
-    # depends_on:
-    #   solana-validator:
-    #     condition: service_healthy
+    depends_on:
+      solana-validator:
+        condition: service_healthy
     volumes:
       - .:/workspaces/p2p
       - ./programs:/workspaces/programs
@@ -37,6 +36,7 @@ services:
       context: ./docker/solana-validator
       dockerfile: Dockerfile
     container_name: p2p-anchor-dev
+    platform: linux/amd64
     ports:
       - "8898:8899"  # JSON RPC
       - "8901:8900"  # WebSocket
@@ -54,7 +54,7 @@ services:
       START_VALIDATOR: "true"  # Set to false for dev mode only
       SKIP_DEPLOYMENT: "false"  # Set to true to skip automatic deployment
     healthcheck:
-      test: ["CMD-SHELL", "/usr/local/bin/check-deployment.sh || exit 1"]
+      test: ["CMD-SHELL", "/usr/local/bin/health-check || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -101,13 +101,14 @@ services:
 
   # Kafka Message Queue
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: wurstmeister/kafka:latest
     container_name: p2p-kafka
     ports:
       - "9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     depends_on:

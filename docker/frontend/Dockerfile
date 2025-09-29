@@ -20,7 +20,7 @@ RUN pnpm install --frozen-lockfile
 COPY frontend/ ./frontend/
 
 # Copy anchor exports for frontend integration
-COPY anchor/src/gridtokenxapp-exports.ts ./anchor/src/
+COPY frontend/src/shared/anchor/ ./frontend/src/shared/anchor/
 
 # Copy production environment variables
 COPY docker/frontend/.env.production ./frontend/.env.production

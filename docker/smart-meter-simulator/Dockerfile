@@ -30,8 +30,9 @@ RUN pip install --no-cache-dir uv
 # Set working directory
 WORKDIR /app
 
-# Copy UV configuration files
-COPY pyproject.toml uv.lock ./
+
+# Copy all application source (including config, code, README, etc.) to builder
+COPY . .
 
 # Create virtual environment and install dependencies
 RUN uv venv /app/.venv && \
@@ -56,11 +57,10 @@ RUN groupadd -r gridtokenx && useradd -r -g gridtokenx -s /bin/bash gridtokenx
 # Set working directory
 WORKDIR /app
 
-# Copy Python virtual environment from builder stage
+# Copy Python virtual environment and application code from builder stage
 COPY --from=builder /app/.venv /app/.venv
-
-# Copy application code
-COPY --chown=gridtokenx:gridtokenx . .
+COPY --from=builder /app /app
+RUN chown -R gridtokenx:gridtokenx /app
 
 # Create necessary directories with proper permissions
 RUN mkdir -p logs certs/ca certs/meters data && \

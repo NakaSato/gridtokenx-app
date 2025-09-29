@@ -1,8 +1,7 @@
 import { GridtokenxappUiCard } from './gridtokenxapp-ui-card'
 import { useGridtokenxappAccountsQuery } from '@/features/gridtokenxapp/data-access/use-gridtokenxapp-accounts-query'
-import { UiWalletAccount } from '@wallet-ui/react'
 
-export function GridtokenxappUiList({ account }: { account: UiWalletAccount }) {
+export function GridtokenxappUiList() {
   const gridtokenxappAccountsQuery = useGridtokenxappAccountsQuery()
 
   if (gridtokenxappAccountsQuery.isLoading) {
@@ -20,8 +19,8 @@ export function GridtokenxappUiList({ account }: { account: UiWalletAccount }) {
 
   return (
     <div className="grid lg:grid-cols-2 gap-4">
-      {gridtokenxappAccountsQuery.data?.map((gridtokenxapp) => (
-        <GridtokenxappUiCard account={account} key={gridtokenxapp.address} gridtokenxapp={gridtokenxapp} />
+      {gridtokenxappAccountsQuery.data?.map((gridtokenxapp: any) => (
+        <GridtokenxappUiCard key={gridtokenxapp.address} gridtokenxapp={gridtokenxapp} />
       ))}
     </div>
   )

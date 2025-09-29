@@ -1,7 +1,5 @@
-# Simplified Solana Validator Dockerfile - Uses Pre-built Binaries
-FROM ubuntu:24.04 AS runtime
-
-ARG SOLANA_VERSION=1.18.17
+# Multi-arch Solana Validator Dockerfile using install script
+FROM ubuntu:24.04
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -11,24 +9,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     bzip2 \
+    gnupg \
+    lsb-release \
+    sudo \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
 # Create solana user
-RUN useradd --create-home --shell /bin/bash --user-group solana
+RUN useradd --create-home --shell /bin/bash --user-group --groups sudo solana && \
+    echo 'solana ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-# Download and install Solana binaries directly
-RUN mkdir -p /tmp/solana && cd /tmp/solana && \
-    # Try direct download from GitHub releases (more reliable)
-    wget -O solana-release.tar.bz2 "https://github.com/solana-labs/solana/releases/download/v${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2" && \
-    tar -xjf solana-release.tar.bz2 && \
-    cp solana-release/bin/solana-test-validator /usr/local/bin/ && \
-    cp solana-release/bin/solana-keygen /usr/local/bin/ && \
-    cp solana-release/bin/solana /usr/local/bin/ && \
-    chmod +x /usr/local/bin/solana* && \
-    cd / && rm -rf /tmp/solana
+# Install Solana CLI by downloading the binary directly v2
+USER solana
+ENV PATH="/home/solana/.local/share/solana/install/active_release/bin:${PATH}"
+RUN mkdir -p /home/solana/.local/share/solana/install/active_release/bin
+RUN cd /tmp && wget https://github.com/solana-labs/solana/releases/download/v1.18.17/solana-release-x86_64-unknown-linux-gnu.tar.bz2
+RUN cd /tmp && tar -xjf solana-release-x86_64-unknown-linux-gnu.tar.bz2
+RUN ls -la /tmp/solana-release/bin/
+RUN cp /tmp/solana-release/bin/solana* /home/solana/.local/share/solana/install/active_release/bin/
+RUN rm -rf /tmp/solana-release*
+RUN ls -la /home/solana/.local/share/solana/install/active_release/bin/
+RUN solana --version
 
 # Create required directories
+USER root
 RUN mkdir -p \
     /opt/solana/ledger \
     /opt/solana/config \
