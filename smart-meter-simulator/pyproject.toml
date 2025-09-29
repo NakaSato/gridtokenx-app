@@ -15,6 +15,8 @@ dependencies = [
     "cryptography>=41.0.0",
     "xmltodict>=0.13.0",
     "pydantic>=2.0.0",
+    # InfluxDB client for time-series data storage
+    "influxdb-client>=1.36.0",
     # Additional utilities
     "pandas>=2.0.0",
     "requests>=2.31.0",

@@ -1,0 +1,9 @@
+{
+  "subject": "GridTokenX UTCC Root CA",
+  "issuer": "GridTokenX UTCC Root CA",
+  "serial_number": "5091715a-7faf-4ab1-91d4-ab1bc8a9ec55",
+  "not_before": "2025-09-29T16:31:23.485010",
+  "not_after": "2035-09-27T16:31:23.485013",
+  "public_key": "simulated_rsa_key_4096",
+  "signature": "simulated_signature_sha256"
+}

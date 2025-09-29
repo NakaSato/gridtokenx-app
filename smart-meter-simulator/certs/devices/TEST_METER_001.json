@@ -1,0 +1,28 @@
+{
+  "version": "3",
+  "serial_number": "6a492458-b2ec-4cc3-8539-9ccd0efb88d2",
+  "subject": {
+    "common_name": "TEST_METER_001",
+    "organization": "UTCC University",
+    "organizational_unit": "Smart Meters",
+    "country": "TH",
+    "state": "Bangkok",
+    "locality": "Bangkok"
+  },
+  "issuer": "GridTokenX UTCC Root CA",
+  "not_before": "2025-09-29T16:38:32.647124",
+  "not_after": "2026-09-29T16:38:32.647127",
+  "public_key": "simulated_rsa_key_2048_TEST_METER_001",
+  "signature": "simulated_signature_sha256_c396f1ed-c84f-4357-9616-f046e9c7f6a7",
+  "extensions": {
+    "key_usage": [
+      "digital_signature",
+      "key_encipherment"
+    ],
+    "extended_key_usage": [
+      "client_auth"
+    ],
+    "subject_key_identifier": "ski_ab13e140-d0f5-42e0-83cb-1b5cc8901fa2",
+    "authority_key_identifier": "aki_2346690c-fad2-430f-9406-2529742abb83"
+  }
+}

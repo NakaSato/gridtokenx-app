@@ -99,6 +99,26 @@ services:
       timeout: 10s
       retries: 5
 
+  # InfluxDB Time-Series Database
+  influxdb:
+    build:
+      context: ./docker/influxdb
+      dockerfile: Dockerfile
+    container_name: p2p-influxdb
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb
+      - influxdb_config:/etc/influxdb
+    networks:
+      - p2p-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   # Kafka Message Queue
   kafka:
     image: wurstmeister/kafka:latest
@@ -262,6 +282,8 @@ volumes:
   deployment_logs:
   postgres_data:
   redis_data:
+  influxdb_data:
+  influxdb_config:
   kafka_data:
   zookeeper_data:
   zookeeper_logs:

@@ -1,24 +1,42 @@
 #!/usr/bin/env python3
 """
-Simplified Smart Meter Simulator Runner for UTCC University GridTokenX Campus Network
-IEEE 2030.5-2018 Smart Energy Profile 2.0
+UTCC University GridTokenX Smart Meter Simulator
+IEEE 2030.5-2018 Smart Energy Profile 2.0 with Campus Network Support
+Combined simulator with optional IEEE 2030.5 protocol support
 """
 
 import sys
 import json
-import time
 import random
 import logging
-import threading
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, field, asdict
+from typing import Dict, List, Optional
+from dataclasses import dataclass, asdict
 import asyncio
-import aiohttp
 from aiohttp import web
 from dotenv import load_dotenv
+
+# InfluxDB imports (optional)
+try:
+    from influxdb_client.client.influxdb_client import InfluxDBClient
+    from influxdb_client.client.write.point import Point
+    from influxdb_client.domain.write_precision import WritePrecision
+    from influxdb_client.client.write_api import SYNCHRONOUS
+    INFLUXDB_AVAILABLE = True
+except ImportError:
+    INFLUXDB_AVAILABLE = False
+
+# IEEE 2030.5 imports (optional)
+try:
+    from ieee2030_5.server import IEEE20305Server
+    from ieee2030_5.client import IEEE20305Client
+    from ieee2030_5.security import SecurityManager
+    from ieee2030_5.resources import MeterReading as IEEE20305MeterReading
+    IEEE2030_5_AVAILABLE = True
+except ImportError:
+    IEEE2030_5_AVAILABLE = False
 
 # Load environment variables from .env file
 load_dotenv()
@@ -30,6 +48,12 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(), logging.FileHandler("logs/simulator.log")],
 )
 logger = logging.getLogger(__name__)
+
+# Log availability of optional modules
+if not IEEE2030_5_AVAILABLE:
+    logger.warning("IEEE 2030.5 modules not available - running in basic mode")
+if not INFLUXDB_AVAILABLE:
+    logger.warning("InfluxDB client not available - data logging disabled")
 
 
 @dataclass
@@ -110,7 +134,7 @@ class SmartMeter:
                 generation = 0.0
 
         # Battery management
-        if self.has_battery:
+        if self.has_battery and self.battery_level is not None:
             if generation > consumption:  # Charging
                 charge_rate = min(generation - consumption, self.capacity_kw * 0.2)
                 self.battery_level = min(100.0, self.battery_level + charge_rate * 0.1)
@@ -133,7 +157,7 @@ class SmartMeter:
             voltage=230 + random.uniform(-5, 5),
             current=round(consumption / 230 * 1000, 2),
             power_factor=0.95 + random.uniform(-0.05, 0.05),
-            battery_level=round(self.battery_level, 2) if self.has_battery else None,
+            battery_level=round(self.battery_level, 2) if self.has_battery and self.battery_level is not None else None,
             solar_generation=round(generation, 2) if self.has_solar else None,
             grid_feed_in=round(grid_feed_in, 2),
             temperature=25 + random.uniform(-2, 2),
@@ -157,6 +181,18 @@ class CampusNetworkSimulator:
         self.is_running = False
         self.readings_buffer: List[Dict] = []
         self.api_server = None
+
+        # Initialize InfluxDB client
+        self.influx_client = None
+        self.write_api = None
+        self._init_influxdb()
+
+        # Initialize IEEE 2030.5 components
+        self.ieee2030_5_enabled = False
+        self.ieee2030_5_server = None
+        self.ieee2030_5_clients = {}
+        self.ieee2030_5_security = None
+        self._init_ieee2030_5()
 
         # Initialize meters
         self._initialize_meters()
@@ -184,6 +220,142 @@ class CampusNetworkSimulator:
             meter = SmartMeter(meter_config)
             self.meters.append(meter)
 
+    def _init_influxdb(self):
+        """Initialize InfluxDB client for meter data storage"""
+        if not INFLUXDB_AVAILABLE:
+            logger.info("InfluxDB integration disabled - module not available")
+            self.influx_client = None
+            self.write_api = None
+            return
+
+        influx_enabled = os.getenv("INFLUXDB_ENABLED", "false").lower() == "true"
+        if not influx_enabled:
+            logger.info("InfluxDB integration disabled")
+            self.influx_client = None
+            self.write_api = None
+            return
+
+        try:
+            influx_url = os.getenv("INFLUXDB_URL", "http://localhost:8086")
+            influx_token = os.getenv("INFLUXDB_TOKEN", "")
+            influx_org = os.getenv("INFLUXDB_ORG", "gridtokenx")
+
+            if not influx_token:
+                logger.warning("InfluxDB token not provided, integration disabled")
+                self.influx_client = None
+                self.write_api = None
+                return
+
+            self.influx_client = InfluxDBClient(  # type: ignore
+                url=influx_url,
+                token=influx_token,
+                org=influx_org
+            )
+
+            self.write_api = self.influx_client.write_api(write_options=SYNCHRONOUS)  # type: ignore
+            logger.info(f"InfluxDB client initialized for {influx_url}")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize InfluxDB client: {e}")
+            self.influx_client = None
+            self.write_api = None
+
+    def _init_ieee2030_5(self):
+        """Initialize IEEE 2030.5 components if enabled"""
+        if not IEEE2030_5_AVAILABLE:
+            logger.info("IEEE 2030.5 support disabled - modules not available")
+            return
+
+        ieee2030_5_enabled = os.getenv("IEEE2030_5_ENABLED", "false").lower() == "true"
+        if not ieee2030_5_enabled:
+            logger.info("IEEE 2030.5 support disabled")
+            return
+
+        try:
+            # Initialize IEEE 2030.5 components
+            self.ieee2030_5_server = IEEE20305Server(  # type: ignore
+                host=os.getenv("IEEE2030_5_HOST", "0.0.0.0"),
+                port=int(os.getenv("IEEE2030_5_PORT", "8443"))
+            )
+            self.ieee2030_5_clients = {}
+            self.ieee2030_5_security = SecurityManager()  # type: ignore
+
+            # Register meters with IEEE 2030.5
+            for meter_config in self.config.get("meters", []):
+                meter_id = meter_config["id"]
+                device_lfdi = meter_config.get("lfdi", f"LFDI_{meter_id}")
+
+                # Register device with security manager
+                device_info = {
+                    "organization": "UTCC University",
+                    "device_category": meter_config.get("type", "smart_meter")
+                }
+                self.ieee2030_5_security.register_device(device_lfdi, device_info)
+
+                # Create client
+                client = IEEE20305Client(  # type: ignore
+                    server_url=f"http://localhost:{self.ieee2030_5_server.port}",
+                    security_manager=self.ieee2030_5_security,
+                    device_lfdi=device_lfdi
+                )
+
+                # Register device with server
+                if client.register_device(device_info):
+                    client.register_mirror_usage_point(meter_config)
+                    self.ieee2030_5_clients[meter_id] = client
+                    logger.info(f"✅ IEEE 2030.5 client registered for meter {meter_id}")
+
+            self.ieee2030_5_enabled = True
+            logger.info(f"IEEE 2030.5 initialized with {len(self.ieee2030_5_clients)} clients")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize IEEE 2030.5: {e}")
+            self.ieee2030_5_enabled = False
+
+    async def _send_to_influxdb(self, readings: List[Dict]):
+        """Send meter readings to InfluxDB"""
+        if not self.write_api:
+            return
+
+        try:
+            bucket = os.getenv("INFLUXDB_BUCKET", "meter_readings_2y")
+            points = []
+
+            for reading in readings:
+                point = (Point("meter_readings")  # type: ignore
+                    .tag("meter_id", reading["meter_id"])
+                    .tag("building", reading["building"])
+                    .tag("floor", str(reading["floor"]))
+                    .tag("meter_type", reading["meter_type"])
+                    .field("energy_consumed", reading["energy_consumed"])
+                    .field("energy_generated", reading["energy_generated"])
+                    .field("voltage", reading["voltage"])
+                    .field("current", reading["current"])
+                    .field("power_factor", reading["power_factor"])
+                    .field("temperature", reading["temperature"])
+                    .field("humidity", reading["humidity"]))
+
+                # Optional fields
+                if reading.get("battery_level") is not None:
+                    point = point.field("battery_level", reading["battery_level"])
+                if reading.get("solar_generation") is not None:
+                    point = point.field("solar_generation", reading["solar_generation"])
+                if reading.get("grid_feed_in") is not None:
+                    point = point.field("grid_feed_in", reading["grid_feed_in"])
+
+                # Set timestamp
+                timestamp = datetime.fromisoformat(reading["timestamp"].replace('Z', '+00:00'))
+                point = point.time(timestamp, WritePrecision.NS)  # type: ignore
+
+                points.append(point)
+
+            # Write points to InfluxDB
+            self.write_api.write(bucket=bucket, record=points)
+            logger.debug(f"Sent {len(points)} meter readings to InfluxDB")
+
+        except Exception as e:
+            logger.error(f"Failed to send data to InfluxDB: {e}")
+
     async def collect_readings(self, simulation_interval: int = 15):
         """Collect readings from all meters periodically"""
         while self.is_running:
@@ -192,8 +364,28 @@ class CampusNetworkSimulator:
                 reading = meter.generate_reading()
                 readings.append(reading.to_dict())
 
+                # Send to IEEE 2030.5 if enabled
+                if self.ieee2030_5_enabled and meter.meter_id in self.ieee2030_5_clients:
+                    try:
+                        client = self.ieee2030_5_clients[meter.meter_id]
+                        # Convert to IEEE 2030.5 MeterReading format
+                        ieee_reading = IEEE20305MeterReading(  # type: ignore
+                            reading_type="energy",
+                            value=reading.energy_consumed,
+                            uom="kW",
+                            quality="valid",
+                            timestamp=datetime.fromisoformat(reading.timestamp.replace('Z', '+00:00'))
+                        )
+                        client.send_meter_reading(ieee_reading)
+                    except Exception as e:
+                        logger.error(f"Failed to send IEEE 2030.5 reading for {meter.meter_id}: {e}")
+
             # Store in buffer
             self.readings_buffer = readings
+
+            # Send to InfluxDB if enabled
+            if self.write_api:
+                await self._send_to_influxdb(readings)
 
             # Log summary
             total_consumption = sum(r["energy_consumed"] for r in readings)
@@ -282,6 +474,36 @@ class CampusNetworkSimulator:
 
         return web.json_response(summary)
 
+    async def handle_ieee2030_5_status(self, request):
+        """Get IEEE 2030.5 status"""
+        if not self.ieee2030_5_enabled:
+            return web.json_response({"error": "IEEE 2030.5 not enabled"}, status=503)
+
+        status = {
+            "enabled": self.ieee2030_5_enabled,
+            "server_port": getattr(self.ieee2030_5_server, 'port', None) if self.ieee2030_5_server else None,
+            "clients_connected": len(self.ieee2030_5_clients),
+            "server_running": self.ieee2030_5_server is not None,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        return web.json_response(status)
+
+    async def handle_ieee2030_5_clients(self, request):
+        """Get IEEE 2030.5 client information"""
+        if not self.ieee2030_5_enabled:
+            return web.json_response({"error": "IEEE 2030.5 not enabled"}, status=503)
+
+        clients_info = []
+        for meter_id, client in self.ieee2030_5_clients.items():
+            clients_info.append({
+                "meter_id": meter_id,
+                "device_lfdi": getattr(client, 'device_lfdi', 'unknown'),
+                "server_url": getattr(client, 'server_url', 'unknown'),
+                "connected": True
+            })
+
+        return web.json_response({"clients": clients_info})
+
     async def setup_api_server(self, app):
         """Setup API routes"""
         app.router.add_get("/health", self.handle_health)
@@ -289,6 +511,11 @@ class CampusNetworkSimulator:
         app.router.add_get("/api/readings", self.handle_readings)
         app.router.add_get("/api/meters/{meter_id}/reading", self.handle_meter_reading)
         app.router.add_get("/api/campus/summary", self.handle_campus_summary)
+
+        # IEEE 2030.5 endpoints (if enabled)
+        if self.ieee2030_5_enabled:
+            app.router.add_get("/api/ieee2030_5/status", self.handle_ieee2030_5_status)
+            app.router.add_get("/api/ieee2030_5/clients", self.handle_ieee2030_5_clients)
 
         # Add index page
         app.router.add_get("/", self.handle_index)
@@ -328,10 +555,19 @@ class CampusNetworkSimulator:
             <div class="endpoint">
                 <span class="method">GET</span> <span class="path">/api/campus/summary</span> - Campus energy summary
             </div>
+            {f'''
+            <div class="endpoint">
+                <span class="method">GET</span> <span class="path">/api/ieee2030_5/status</span> - IEEE 2030.5 status
+            </div>
+            <div class="endpoint">
+                <span class="method">GET</span> <span class="path">/api/ieee2030_5/clients</span> - IEEE 2030.5 clients
+            </div>
+            ''' if self.ieee2030_5_enabled else ''}
 
             <h2>Status:</h2>
             <p>✅ Simulator is running</p>
             <p>📊 Collecting readings every {self.simulation_interval} seconds</p>
+            {f'<p>🔌 IEEE 2030.5: Enabled (Port {getattr(self.ieee2030_5_server, "port", "N/A")})</p>' if self.ieee2030_5_enabled else '<p>ℹ️ IEEE 2030.5: Disabled</p>'}
         </body>
         </html>
         """
@@ -344,6 +580,15 @@ class CampusNetworkSimulator:
         # Load configuration from environment
         self.api_port = int(os.getenv("API_PORT", "4040"))
         self.simulation_interval = int(os.getenv("SIMULATION_INTERVAL", "15"))
+
+        # Start IEEE 2030.5 server if enabled
+        if self.ieee2030_5_enabled and self.ieee2030_5_server:
+            try:
+                await self.ieee2030_5_server.start()
+                logger.info(f"IEEE 2030.5 server started on port {self.ieee2030_5_server.port}")
+            except Exception as e:
+                logger.error(f"Failed to start IEEE 2030.5 server: {e}")
+                self.ieee2030_5_enabled = False
 
         # Create web application
         app = web.Application()
@@ -366,6 +611,11 @@ class CampusNetworkSimulator:
         print(f"📊 Managing {len(self.meters)} smart meters")
         print(f"🌐 API Server: http://localhost:{self.api_port}")
         print(f"📈 Collecting readings every {self.simulation_interval} seconds")
+        if self.ieee2030_5_enabled:
+            print(f"🔌 IEEE 2030.5 Server: http://localhost:{getattr(self.ieee2030_5_server, 'port', 'N/A')}")
+            print(f"🤝 IEEE 2030.5 Clients: {len(self.ieee2030_5_clients)} connected")
+        else:
+            print("ℹ️  IEEE 2030.5: Disabled")
         print(f"📝 Logs: logs/simulator.log")
         print("\nPress Ctrl+C to stop the simulator")
         print("=" * 60 + "\n")
@@ -377,6 +627,22 @@ class CampusNetworkSimulator:
     def stop(self):
         """Stop the simulator"""
         self.is_running = False
+
+        # Stop IEEE 2030.5 server
+        if self.ieee2030_5_enabled and self.ieee2030_5_server:
+            try:
+                asyncio.create_task(self.ieee2030_5_server.stop())
+                logger.info("IEEE 2030.5 server stopped")
+            except Exception as e:
+                logger.error(f"Error stopping IEEE 2030.5 server: {e}")
+
+        # Disconnect IEEE 2030.5 clients
+        for client in self.ieee2030_5_clients.values():
+            try:
+                client.disconnect()
+            except Exception as e:
+                logger.error(f"Error disconnecting IEEE 2030.5 client: {e}")
+
         for meter in self.meters:
             meter.stop()
         logger.info("Campus Network Simulator stopped")
@@ -392,8 +658,24 @@ async def main():
         default="config/utcc_campus_config.json",
         help="Path to campus configuration file",
     )
+    parser.add_argument(
+        "--enable-ieee2030-5",
+        action="store_true",
+        help="Enable IEEE 2030.5 Smart Energy Profile support",
+    )
+    parser.add_argument(
+        "--ieee2030-5-port",
+        type=int,
+        default=8443,
+        help="Port for IEEE 2030.5 server (default: 8443)",
+    )
 
     args = parser.parse_args()
+
+    # Set environment variables based on command line args
+    if args.enable_ieee2030_5:
+        os.environ["IEEE2030_5_ENABLED"] = "true"
+        os.environ["IEEE2030_5_PORT"] = str(args.ieee2030_5_port)
 
     # Create and start simulator
     simulator = CampusNetworkSimulator(args.config_file)
