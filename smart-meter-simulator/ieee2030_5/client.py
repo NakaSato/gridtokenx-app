@@ -35,6 +35,11 @@ class IEEE20305Client:
             'User-Agent': 'GridTokenX-SmartMeter/1.0'
         })
 
+        # Disable SSL verification for self-signed certificates in development
+        self.session.verify = False
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
     def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict:
         """Make an HTTP request to the IEEE 2030.5 server"""
         url = urljoin(self.server_url, endpoint.lstrip('/'))

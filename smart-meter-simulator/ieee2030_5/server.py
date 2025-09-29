@@ -21,7 +21,7 @@ class IEEE20305Server:
     """IEEE 2030.5 Server implementation"""
 
     def __init__(self, host: str = "0.0.0.0", port: int = 8443,
-                 cert_file: str = "certs/server.crt", key_file: str = "certs/server.key"):
+                 cert_file: Optional[str] = "certs/server.crt", key_file: Optional[str] = "certs/server.key"):
         self.host = host
         self.port = port
         self.cert_file = cert_file
@@ -298,6 +298,43 @@ class IEEE20305Server:
         except KeyboardInterrupt:
             print("\nShutting down server...")
             await self.stop()
+
+    async def start_background(self):
+        """Start the IEEE 2030.5 server in background mode (no infinite loop)"""
+        # Setup SSL context if certificates exist
+        ssl_context = None
+        try:
+            if self.cert_file and self.key_file:
+                ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                ssl_context.load_cert_chain(self.cert_file, self.key_file)
+                print(f"SSL enabled with certificate: {self.cert_file}")
+        except FileNotFoundError:
+            print("SSL certificates not found, running without SSL")
+        except Exception as e:
+            print(f"SSL setup failed: {e}, running without SSL")
+
+        # Start server
+        self.runner = web.AppRunner(self.app)
+        await self.runner.setup()
+
+        if ssl_context:
+            self.site = web.TCPSite(self.runner, self.host, self.port, ssl_context=ssl_context)
+            protocol = "https"
+        else:
+            self.site = web.TCPSite(self.runner, self.host, self.port)
+            protocol = "http"
+
+        await self.site.start()
+
+        print("=" * 60)
+        print("🏫 IEEE 2030.5 Smart Energy Profile 2.0 Server (Background Mode)")
+        print("=" * 60)
+        print(f"✅ Server started on {protocol}://{self.host}:{self.port}")
+        print(f"📊 Function sets available: {', '.join(self.function_sets.list_function_sets())}")
+        print(f"🔐 SSL: {'Enabled' if ssl_context else 'Disabled'}")
+        print(f"📱 WebSocket: {protocol}://{self.host}:{self.port}/ws")
+        print(f"💚 Health check: {protocol}://{self.host}:{self.port}/health")
+        print("=" * 60)
 
     async def stop(self):
         """Stop the IEEE 2030.5 server"""

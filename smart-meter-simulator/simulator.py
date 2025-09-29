@@ -228,9 +228,12 @@ class CampusNetworkSimulator:
             self.write_api = None
             return
 
-        influx_enabled = os.getenv("INFLUXDB_ENABLED", "false").lower() == "true"
+        # Enable InfluxDB by default, but allow override via environment variable
+        influx_enabled_env = os.getenv("INFLUXDB_ENABLED", "true").lower()
+        influx_enabled = influx_enabled_env in ("true", "1", "yes", "on")
+
         if not influx_enabled:
-            logger.info("InfluxDB integration disabled")
+            logger.info("InfluxDB integration disabled by configuration")
             self.influx_client = None
             self.write_api = None
             return
@@ -241,10 +244,8 @@ class CampusNetworkSimulator:
             influx_org = os.getenv("INFLUXDB_ORG", "gridtokenx")
 
             if not influx_token:
-                logger.warning("InfluxDB token not provided, integration disabled")
-                self.influx_client = None
-                self.write_api = None
-                return
+                logger.warning("InfluxDB token not provided - using default empty token (may not work)")
+                # Don't disable InfluxDB, just warn - some InfluxDB setups might work without token
 
             self.influx_client = InfluxDBClient(  # type: ignore
                 url=influx_url,
@@ -266,7 +267,7 @@ class CampusNetworkSimulator:
             logger.info("IEEE 2030.5 support disabled - modules not available")
             return
 
-        ieee2030_5_enabled = os.getenv("IEEE2030_5_ENABLED", "false").lower() == "true"
+        ieee2030_5_enabled = os.getenv("IEEE2030_5_ENABLED", "true").lower() == "true"
         if not ieee2030_5_enabled:
             logger.info("IEEE 2030.5 support disabled")
             return
@@ -275,11 +276,29 @@ class CampusNetworkSimulator:
             # Initialize IEEE 2030.5 components
             self.ieee2030_5_server = IEEE20305Server(  # type: ignore
                 host=os.getenv("IEEE2030_5_HOST", "0.0.0.0"),
-                port=int(os.getenv("IEEE2030_5_PORT", "8443"))
+                port=int(os.getenv("IEEE2030_5_PORT", "8443")),
+                cert_file=None,  # Disable SSL for now
+                key_file=None
             )
             self.ieee2030_5_clients = {}
             self.ieee2030_5_security = SecurityManager()  # type: ignore
 
+            # Note: Client registration will happen in start() after server is running
+            self.ieee2030_5_enabled = True
+            logger.info("IEEE 2030.5 components initialized (clients will register after server starts)")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize IEEE 2030.5: {e}")
+            self.ieee2030_5_enabled = False
+
+    async def _register_ieee2030_5_clients(self):
+        """Register IEEE 2030.5 clients after server is running"""
+        if not self.ieee2030_5_enabled or not self.ieee2030_5_server or not self.ieee2030_5_security:
+            logger.warning("IEEE 2030.5 client registration skipped - components not ready")
+            return
+
+        logger.info("Starting IEEE 2030.5 client registration...")
+        try:
             # Register meters with IEEE 2030.5
             for meter_config in self.config.get("meters", []):
                 meter_id = meter_config["id"]
@@ -304,17 +323,18 @@ class CampusNetworkSimulator:
                     client.register_mirror_usage_point(meter_config)
                     self.ieee2030_5_clients[meter_id] = client
                     logger.info(f"✅ IEEE 2030.5 client registered for meter {meter_id}")
+                else:
+                    logger.warning(f"❌ Failed to register IEEE 2030.5 client for meter {meter_id}")
 
-            self.ieee2030_5_enabled = True
-            logger.info(f"IEEE 2030.5 initialized with {len(self.ieee2030_5_clients)} clients")
+            logger.info(f"IEEE 2030.5 client registration complete: {len(self.ieee2030_5_clients)} clients connected")
 
         except Exception as e:
-            logger.error(f"Failed to initialize IEEE 2030.5: {e}")
-            self.ieee2030_5_enabled = False
+            logger.error(f"Failed to register IEEE 2030.5 clients: {e}")
 
     async def _send_to_influxdb(self, readings: List[Dict]):
         """Send meter readings to InfluxDB"""
         if not self.write_api:
+            logger.debug("InfluxDB write API not available - skipping data storage")
             return
 
         try:
@@ -351,10 +371,11 @@ class CampusNetworkSimulator:
 
             # Write points to InfluxDB
             self.write_api.write(bucket=bucket, record=points)
-            logger.debug(f"Sent {len(points)} meter readings to InfluxDB")
+            logger.debug(f"✅ Stored {len(points)} meter readings in InfluxDB")
 
         except Exception as e:
-            logger.error(f"Failed to send data to InfluxDB: {e}")
+            logger.error(f"❌ Failed to send data to InfluxDB: {e}")
+            raise  # Re-raise so calling code knows it failed
 
     async def collect_readings(self, simulation_interval: int = 15):
         """Collect readings from all meters periodically"""
@@ -383,9 +404,12 @@ class CampusNetworkSimulator:
             # Store in buffer
             self.readings_buffer = readings
 
-            # Send to InfluxDB if enabled
-            if self.write_api:
+            # Always attempt to send to InfluxDB (data persistence is critical)
+            try:
                 await self._send_to_influxdb(readings)
+            except Exception as e:
+                logger.error(f"Failed to store readings in InfluxDB: {e}")
+                # Continue running even if InfluxDB fails - data is still in buffer
 
             # Log summary
             total_consumption = sum(r["energy_consumed"] for r in readings)
@@ -522,6 +546,10 @@ class CampusNetworkSimulator:
 
     async def handle_index(self, request):
         """Simple index page with API documentation"""
+        # Get the base URL for constructing links
+        host = request.headers.get('Host', f'localhost:{self.api_port}')
+        base_url = f"http://{host}"
+        
         html_content = f"""
         <!DOCTYPE html>
         <html>
@@ -532,7 +560,9 @@ class CampusNetworkSimulator:
                 h1 {{ color: #2c3e50; }}
                 .endpoint {{ background: #f4f4f4; padding: 10px; margin: 10px 0; border-radius: 5px; }}
                 .method {{ color: #27ae60; font-weight: bold; }}
-                .path {{ color: #2980b9; font-family: monospace; }}
+                .path {{ color: #2980b9; font-family: monospace; text-decoration: none; }}
+                .path:hover {{ text-decoration: underline; }}
+                .description {{ color: #555; }}
             </style>
         </head>
         <body>
@@ -541,32 +571,47 @@ class CampusNetworkSimulator:
 
             <h2>API Endpoints:</h2>
             <div class="endpoint">
-                <span class="method">GET</span> <span class="path">/health</span> - Health check
+                <span class="method">GET</span> 
+                <a href="{base_url}/health" class="path">/health</a> 
+                <span class="description">- Health check</span>
             </div>
             <div class="endpoint">
-                <span class="method">GET</span> <span class="path">/api/meters</span> - List all meters
+                <span class="method">GET</span> 
+                <a href="{base_url}/api/meters" class="path">/api/meters</a> 
+                <span class="description">- List all meters</span>
             </div>
             <div class="endpoint">
-                <span class="method">GET</span> <span class="path">/api/readings</span> - Get latest readings
+                <span class="method">GET</span> 
+                <a href="{base_url}/api/readings" class="path">/api/readings</a> 
+                <span class="description">- Get latest readings</span>
             </div>
             <div class="endpoint">
-                <span class="method">GET</span> <span class="path">/api/meters/{{meter_id}}/reading</span> - Get specific meter reading
+                <span class="method">GET</span> 
+                <span class="path">/api/meters/{{meter_id}}/reading</span> 
+                <span class="description">- Get specific meter reading (replace {{meter_id}} with actual meter ID)</span>
             </div>
             <div class="endpoint">
-                <span class="method">GET</span> <span class="path">/api/campus/summary</span> - Campus energy summary
+                <span class="method">GET</span> 
+                <a href="{base_url}/api/campus/summary" class="path">/api/campus/summary</a> 
+                <span class="description">- Campus energy summary</span>
             </div>
             {f'''
             <div class="endpoint">
-                <span class="method">GET</span> <span class="path">/api/ieee2030_5/status</span> - IEEE 2030.5 status
+                <span class="method">GET</span> 
+                <a href="{base_url}/api/ieee2030_5/status" class="path">/api/ieee2030_5/status</a> 
+                <span class="description">- IEEE 2030.5 status</span>
             </div>
             <div class="endpoint">
-                <span class="method">GET</span> <span class="path">/api/ieee2030_5/clients</span> - IEEE 2030.5 clients
+                <span class="method">GET</span> 
+                <a href="{base_url}/api/ieee2030_5/clients" class="path">/api/ieee2030_5/clients</a> 
+                <span class="description">- IEEE 2030.5 clients</span>
             </div>
             ''' if self.ieee2030_5_enabled else ''}
 
             <h2>Status:</h2>
             <p>✅ Simulator is running</p>
             <p>📊 Collecting readings every {self.simulation_interval} seconds</p>
+            <p>💾 InfluxDB: {'Enabled' if self.write_api else 'Disabled'}</p>
             {f'<p>🔌 IEEE 2030.5: Enabled (Port {getattr(self.ieee2030_5_server, "port", "N/A")})</p>' if self.ieee2030_5_enabled else '<p>ℹ️ IEEE 2030.5: Disabled</p>'}
         </body>
         </html>
@@ -584,8 +629,15 @@ class CampusNetworkSimulator:
         # Start IEEE 2030.5 server if enabled
         if self.ieee2030_5_enabled and self.ieee2030_5_server:
             try:
-                await self.ieee2030_5_server.start()
+                await self.ieee2030_5_server.start_background()
                 logger.info(f"IEEE 2030.5 server started on port {self.ieee2030_5_server.port}")
+
+                # Wait a moment for server to be fully ready
+                await asyncio.sleep(2)
+
+                # Now register clients after server is running
+                await self._register_ieee2030_5_clients()
+
             except Exception as e:
                 logger.error(f"Failed to start IEEE 2030.5 server: {e}")
                 self.ieee2030_5_enabled = False
@@ -611,12 +663,13 @@ class CampusNetworkSimulator:
         print(f"📊 Managing {len(self.meters)} smart meters")
         print(f"🌐 API Server: http://localhost:{self.api_port}")
         print(f"📈 Collecting readings every {self.simulation_interval} seconds")
+        print(f"💾 InfluxDB Storage: {'Enabled' if self.write_api else 'Disabled'}")
         if self.ieee2030_5_enabled:
-            print(f"🔌 IEEE 2030.5 Server: http://localhost:{getattr(self.ieee2030_5_server, 'port', 'N/A')}")
-            print(f"🤝 IEEE 2030.5 Clients: {len(self.ieee2030_5_clients)} connected")
+            print(f"IEEE 2030.5 Server: http://localhost:{getattr(self.ieee2030_5_server, 'port', 'N/A')}")
+            print(f"IEEE 2030.5 Clients: {len(self.ieee2030_5_clients)} connected")
         else:
-            print("ℹ️  IEEE 2030.5: Disabled")
-        print(f"📝 Logs: logs/simulator.log")
+            print("ℹIEEE 2030.5: Disabled")
+        print(f"Logs: logs/simulator.log")
         print("\nPress Ctrl+C to stop the simulator")
         print("=" * 60 + "\n")
 
@@ -659,9 +712,10 @@ async def main():
         help="Path to campus configuration file",
     )
     parser.add_argument(
-        "--enable-ieee2030-5",
+        "--disable-ieee2030-5",
         action="store_true",
-        help="Enable IEEE 2030.5 Smart Energy Profile support",
+        dest="disable_ieee2030_5",
+        help="Disable IEEE 2030.5 Smart Energy Profile support (enabled by default)",
     )
     parser.add_argument(
         "--ieee2030-5-port",
@@ -669,13 +723,20 @@ async def main():
         default=8443,
         help="Port for IEEE 2030.5 server (default: 8443)",
     )
+    parser.add_argument(
+        "--disable-influxdb",
+        action="store_true",
+        help="Disable InfluxDB data storage (enabled by default)",
+    )
 
     args = parser.parse_args()
 
     # Set environment variables based on command line args
-    if args.enable_ieee2030_5:
-        os.environ["IEEE2030_5_ENABLED"] = "true"
-        os.environ["IEEE2030_5_PORT"] = str(args.ieee2030_5_port)
+    if args.disable_ieee2030_5:
+        os.environ["IEEE2030_5_ENABLED"] = "false"
+
+    if args.disable_influxdb:
+        os.environ["INFLUXDB_ENABLED"] = "false"
 
     # Create and start simulator
     simulator = CampusNetworkSimulator(args.config_file)

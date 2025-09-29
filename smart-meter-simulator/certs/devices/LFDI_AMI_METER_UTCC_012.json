@@ -1,0 +1,28 @@
+{
+  "version": "3",
+  "serial_number": "c9597edb-b653-46dd-88e2-a937b59ee0c4",
+  "subject": {
+    "common_name": "LFDI_AMI_METER_UTCC_012",
+    "organization": "UTCC University",
+    "organizational_unit": "Smart Meters",
+    "country": "TH",
+    "state": "Bangkok",
+    "locality": "Bangkok"
+  },
+  "issuer": "GridTokenX UTCC Root CA",
+  "not_before": "2025-09-29T16:39:47.172016",
+  "not_after": "2026-09-29T16:39:47.172018",
+  "public_key": "simulated_rsa_key_2048_LFDI_AMI_METER_UTCC_012",
+  "signature": "simulated_signature_sha256_d912928a-8089-4f5e-93ff-e5b1c09da8aa",
+  "extensions": {
+    "key_usage": [
+      "digital_signature",
+      "key_encipherment"
+    ],
+    "extended_key_usage": [
+      "client_auth"
+    ],
+    "subject_key_identifier": "ski_fa41c016-4f0c-4d26-a7d7-4a8548a21d1f",
+    "authority_key_identifier": "aki_91227252-db64-452d-a0aa-61038f842e38"
+  }
+}
