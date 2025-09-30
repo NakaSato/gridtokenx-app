@@ -75,16 +75,17 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:4040/health || exit 1
+    CMD curl -f http://localhost:4041/health || exit 1
 
 # Switch to non-root user
 USER meter
 
 # Expose ports for HTTP, HTTPS, and gRPC/other
-EXPOSE 4040 8443 8444
+EXPOSE 4041 8443 8444
 
 # Use tini as init system
 ENTRYPOINT ["tini", "--"]
 
-# Default command - can be overridden
+# Default environment and command - can be overridden
+ENV API_PORT=4041
 CMD ["python", "simulator.py"]
