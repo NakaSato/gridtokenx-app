@@ -20,4 +20,5 @@ pub struct AppState {
     pub config: Config,
     pub jwt_service: auth::jwt::JwtService,
     pub api_key_service: auth::jwt::ApiKeyService,
+    pub blockchain_service: Option<services::BlockchainService>,
 }

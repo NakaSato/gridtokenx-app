@@ -103,7 +103,7 @@ pub struct UserActivity {
 }
 
 /// Enhanced user registration with department validation and audit logging
-pub async fn enhanced_register(
+pub async fn register(
     State(state): State<AppState>,
     Json(request): Json<EnhancedRegisterRequest>,
 ) -> Result<Json<SecureAuthResponse>> {

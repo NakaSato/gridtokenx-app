@@ -1,0 +1,36 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Environment
+.env
+.env.local
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Blockchain Keys (IMPORTANT: Never commit private keys!)
+keys/
+*.json
+!test-keypair.json
+
+# Test artifacts
+test-results/
+coverage/

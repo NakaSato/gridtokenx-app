@@ -19,6 +19,11 @@ pub struct Config {
     pub rate_limit_window: u64,
     pub log_level: String,
     pub audit_log_enabled: bool,
+    
+    // Blockchain configuration
+    pub blockchain_enabled: bool,
+    pub oracle_program_id: String,
+    pub api_gateway_keypair_path: String,
 }
 
 impl Config {
@@ -62,6 +67,13 @@ impl Config {
             audit_log_enabled: env::var("AUDIT_LOG_ENABLED")
                 .map_err(|_| anyhow::anyhow!("AUDIT_LOG_ENABLED environment variable is required"))?
                 .parse()?,
+            blockchain_enabled: env::var("BLOCKCHAIN_ENABLED")
+                .unwrap_or_else(|_| "false".to_string())
+                .parse()?,
+            oracle_program_id: env::var("ORACLE_PROGRAM_ID")
+                .unwrap_or_else(|_| "5DF1fmjrXTtG7qsFaLUm5TjJMG7M1a2V7kyTWPjoADV5".to_string()),
+            api_gateway_keypair_path: env::var("API_GATEWAY_KEYPAIR_PATH")
+                .unwrap_or_else(|_| "./keys/api-gateway-keypair.json".to_string()),
         })
     }
 }

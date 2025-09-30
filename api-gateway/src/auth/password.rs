@@ -1,4 +1,5 @@
-use bcrypt::{hash, verify, DEFAULT_COST};
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
+use argon2::password_hash::{rand_core::OsRng, SaltString};
 use crate::error::{ApiError, Result};
 
 pub struct PasswordService;
@@ -8,13 +9,22 @@ impl PasswordService {
         // Validate password strength first
         Self::validate_password_strength(password)?;
         
-        hash(password, DEFAULT_COST)
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        
+        argon2
+            .hash_password(password.as_bytes(), &salt)
+            .map(|hash| hash.to_string())
             .map_err(|e| ApiError::Internal(format!("Failed to hash password: {}", e)))
     }
     
-    pub fn verify_password(password: &str, hash: &str) -> Result<bool> {
-        verify(password, hash)
-            .map_err(|e| ApiError::Internal(format!("Failed to verify password: {}", e)))
+    pub fn verify_password(password: &str, hash_str: &str) -> Result<bool> {
+        let parsed_hash = PasswordHash::new(hash_str)
+            .map_err(|e| ApiError::Internal(format!("Failed to parse hash: {}", e)))?;
+        
+        Ok(Argon2::default()
+            .verify_password(password.as_bytes(), &parsed_hash)
+            .is_ok())
     }
     
     pub fn validate_password_strength(password: &str) -> Result<()> {
@@ -122,32 +132,32 @@ mod tests {
 
     #[test]
     fn test_password_hashing() {
-        let password = "TestPassword123!";
+        let password = "SecureTest123!@#";  // Changed to avoid 'password' pattern
         let hash = PasswordService::hash_password(password).unwrap();
         
         assert!(PasswordService::verify_password(password, &hash).unwrap());
-        assert!(!PasswordService::verify_password("WrongPassword", &hash).unwrap());
+        assert!(!PasswordService::verify_password("WrongSecret", &hash).unwrap());
     }
     
     #[test]
     fn test_password_strength_validation() {
-        // Valid password
-        assert!(PasswordService::validate_password_strength("TestPassword123!").is_ok());
+        // Valid password (avoid 'password' pattern)
+        assert!(PasswordService::validate_password_strength("SecureTest123!@#").is_ok());
         
         // Too short
         assert!(PasswordService::validate_password_strength("Test1!").is_err());
         
         // Missing uppercase
-        assert!(PasswordService::validate_password_strength("testpassword123!").is_err());
+        assert!(PasswordService::validate_password_strength("securetest123!").is_err());
         
         // Missing lowercase
-        assert!(PasswordService::validate_password_strength("TESTPASSWORD123!").is_err());
+        assert!(PasswordService::validate_password_strength("SECURETEST123!").is_err());
         
         // Missing digit
-        assert!(PasswordService::validate_password_strength("TestPassword!").is_err());
+        assert!(PasswordService::validate_password_strength("SecureTest!@#").is_err());
         
         // Missing special character
-        assert!(PasswordService::validate_password_strength("TestPassword123").is_err());
+        assert!(PasswordService::validate_password_strength("SecureTest123").is_err());
         
         // Contains weak pattern
         assert!(PasswordService::validate_password_strength("Password123!").is_err());

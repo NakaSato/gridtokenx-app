@@ -54,6 +54,7 @@ impl TestContext {
             config: config.clone(),
             jwt_service,
             api_key_service,
+            blockchain_service: None,  // No blockchain service needed for auth tests
         };
         
         // Create test user
@@ -108,7 +109,7 @@ impl TestContext {
         Router::new()
             // Authentication routes (no auth required)
             .route("/auth/login", post(api_gateway::handlers::auth::login))
-            .route("/auth/register", post(api_gateway::handlers::user_management::enhanced_register))
+            .route("/auth/register", post(api_gateway::handlers::user_management::register))
             
             // Protected routes
             .route("/auth/profile", get(api_gateway::handlers::auth::get_profile))

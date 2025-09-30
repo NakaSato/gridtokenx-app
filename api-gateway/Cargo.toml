@@ -21,15 +21,16 @@ hyper = { version = "1.0", features = ["full"] }
 tokio = { version = "1.0", features = ["full"] }
 futures = "0.3"
 
-# Database
-sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls", "chrono", "uuid", "bigdecimal", "migrate"] }
+# Database - Using 0.6 to avoid zeroize conflict with Solana
+sqlx = { version = "0.6", features = ["postgres", "runtime-tokio-rustls", "chrono", "uuid", "bigdecimal", "migrate", "offline", "json"] }
 bigdecimal = { version = "0.4", features = ["serde"] }
 
-# Blockchain (to be added in Phase 2)
-# solana-client = "1.17"
-# solana-sdk = "1.17" 
-# anchor-client = "0.30"
-# anchor-lang = "0.30"
+# Blockchain
+solana-client = "1.17"
+solana-sdk = "1.17" 
+anchor-client = "0.30"
+anchor-lang = "0.30"
+borsh = "0.10"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -37,7 +38,7 @@ serde_json = "1.0"
 
 # Authentication
 jsonwebtoken = "9.0"
-bcrypt = "0.15"
+argon2 = "0.5"  # Using argon2 instead of bcrypt for Solana compatibility
 
 # Caching
 redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
@@ -70,8 +71,8 @@ bs58 = "0.5"
 
 [dev-dependencies]
 tokio-test = "0.4"
-testcontainers = "0.16"
-wiremock = "0.5"
+# testcontainers = "0.16"  # Removed due to zeroize conflict with Solana
+# wiremock = "0.5"  # Removed due to potential conflicts
 criterion = "0.5"
 proptest = "1.4"
 tempfile = "3.8"

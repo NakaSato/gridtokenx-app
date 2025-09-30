@@ -8,6 +8,7 @@
 ✅ Simulator started successfully!
 📊 Managing 25 smart meters
 🌐 API Server: http://localhost:4040
+
 ```rview
 
 The GridTokenX Smart Meter Simulator provides a comprehensive REST API for accessing real-time smart meter data from the 25-meter UTCC University campus simulation.

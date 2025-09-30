@@ -20,6 +20,7 @@ mod auth;
 use config::Config;
 use handlers::{health, auth as auth_handlers, user_management, blockchain, analytics, trading, meters};
 use auth::{jwt::JwtService, jwt::ApiKeyService};
+use services::BlockchainService;
 
 /// Application state shared across handlers
 #[derive(Clone)]
@@ -30,6 +31,7 @@ pub struct AppState {
     pub config: Config,
     pub jwt_service: JwtService,
     pub api_key_service: ApiKeyService,
+    pub blockchain_service: Option<BlockchainService>,
 }
 
 #[tokio::main]
@@ -67,6 +69,27 @@ async fn main() -> Result<()> {
     let api_key_service = ApiKeyService::new()?;
     info!("Authentication services initialized");
 
+    // Initialize blockchain service (optional)
+    let blockchain_service = if config.blockchain_enabled {
+        match BlockchainService::new(
+            config.solana_rpc_url.clone(),
+            config.oracle_program_id.clone(),
+            config.api_gateway_keypair_path.clone(),
+        ) {
+            Ok(service) => {
+                info!("✅ Blockchain service initialized successfully");
+                Some(service)
+            }
+            Err(e) => {
+                tracing::warn!("⚠️ Failed to initialize blockchain service: {}. Running without blockchain integration.", e);
+                None
+            }
+        }
+    } else {
+        info!("Blockchain integration disabled");
+        None
+    };
+
     // Create application state
     let app_state = AppState {
         db: db_pool,
@@ -75,6 +98,7 @@ async fn main() -> Result<()> {
         config: config.clone(),
         jwt_service,
         api_key_service,
+        blockchain_service,
     };
 
     // Build application router
@@ -86,7 +110,7 @@ async fn main() -> Result<()> {
         
         // Authentication routes (no authentication required)
         .route("/auth/login", post(auth_handlers::login))
-        .route("/auth/register", post(user_management::enhanced_register))
+        .route("/auth/register", post(user_management::register))
         
         // Protected user routes
         .nest("/auth", Router::new()

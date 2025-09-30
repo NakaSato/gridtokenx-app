@@ -1,3 +1,9 @@
+#!/bin/bash
+# Setup .env file with Docker Compose database credentials
+
+echo "Setting up .env file with Docker Compose credentials..."
+
+cat > .env << 'EOF'
 # Environment Configuration
 ENVIRONMENT=development
 
@@ -31,3 +37,13 @@ RATE_LIMIT_WINDOW=60
 # Logging Configuration
 LOG_LEVEL=info
 AUDIT_LOG_ENABLED=true
+EOF
+
+echo "✅ .env file created with Docker Compose credentials"
+echo ""
+echo "Database URL: postgresql://p2p_user:p2p_password@localhost:5432/p2p_energy_trading"
+echo ""
+echo "Next steps:"
+echo "  1. Start Docker services: docker-compose up -d"
+echo "  2. Build API Gateway: cargo build"
+echo "  3. Run migrations: sqlx migrate run"

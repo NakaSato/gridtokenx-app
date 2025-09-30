@@ -1,2 +1,5 @@
-// Business logic services
-// Authentication, blockchain client, trading engine, etc.
+// Business logic
+// Services module
+pub mod blockchain;
+
+pub use blockchain::BlockchainService;

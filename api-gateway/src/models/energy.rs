@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct EnergyReading {
-    pub id: Option<Uuid>,
+    pub id: Uuid,  // Changed from Option<Uuid> to match database
     pub meter_id: String,
     pub timestamp: DateTime<Utc>,
     pub energy_generated: f64,
@@ -19,7 +19,7 @@ pub struct EnergyReading {
 // Internal database model with BigDecimal for database operations
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct EnergyReadingDb {
-    pub id: Option<Uuid>,
+    pub id: Uuid,  // NOT NULL in database
     pub meter_id: String,
     pub timestamp: DateTime<Utc>,
     pub energy_generated: BigDecimal,
@@ -27,7 +27,7 @@ pub struct EnergyReadingDb {
     pub solar_irradiance: Option<BigDecimal>,
     pub temperature: Option<BigDecimal>,
     pub metadata: Option<serde_json::Value>,
-    pub created_at: Option<DateTime<Utc>>, // Make this optional to handle defaults
+    pub created_at: DateTime<Utc>,  // NOT NULL in database (has DEFAULT)
 }
 
 impl From<EnergyReadingDb> for EnergyReading {
@@ -43,7 +43,7 @@ impl From<EnergyReadingDb> for EnergyReading {
             solar_irradiance: db_reading.solar_irradiance.map(|bd| f64::from_str(&bd.to_string()).unwrap_or(0.0)),
             temperature: db_reading.temperature.map(|bd| f64::from_str(&bd.to_string()).unwrap_or(0.0)),
             metadata: db_reading.metadata,
-            created_at: db_reading.created_at.unwrap_or_else(|| Utc::now()),
+            created_at: db_reading.created_at,  // No longer Option
         }
     }
 }

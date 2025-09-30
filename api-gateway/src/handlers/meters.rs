@@ -96,13 +96,41 @@ pub async fn submit_energy_reading(
         ApiError::Database(e)
     })?;
 
-    // TODO: In Phase 4, trigger blockchain submission for verified readings
+    // Submit to blockchain if enabled
+    let mut blockchain_signature: Option<String> = None;
+    if let Some(blockchain_service) = &state.blockchain_service {
+        match blockchain_service.submit_meter_reading(
+            payload.meter_id.clone(),
+            payload.energy_generated,
+            payload.energy_consumed,
+            payload.timestamp.timestamp(),
+        ).await {
+            Ok(signature) => {
+                tracing::info!("✅ Blockchain submission successful: {}", signature);
+                blockchain_signature = Some(signature.to_string());
+                
+                // Update database with blockchain signature
+                let _ = sqlx::query!(
+                    "UPDATE energy_readings SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{blockchain_signature}', $1::jsonb) WHERE id = $2",
+                    serde_json::json!(signature.to_string()),
+                    reading_id
+                )
+                .execute(&state.db)
+                .await;
+            }
+            Err(e) => {
+                tracing::error!("❌ Blockchain submission failed: {}", e);
+                // Don't fail the entire request - data is still in database
+                // Could implement retry queue here
+            }
+        }
+    }
 
     Ok(Json(EnergyReadingResponse {
         id: reading_id,
         meter_id: payload.meter_id,
         timestamp: payload.timestamp,
-        status: "submitted".to_string(),
+        status: if blockchain_signature.is_some() { "blockchain_submitted" } else { "submitted" }.to_string(),
         created_at: now,
     }))
 }
