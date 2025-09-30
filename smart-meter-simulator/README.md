@@ -44,6 +44,10 @@ uv run python simulator.py --disable-influxdb
 | `IEEE2030_5_PORT` | `8443` | IEEE 2030.5 server port |
 | `API_PORT` | `4040` | REST API server port |
 | `SIMULATION_INTERVAL` | `15` | Seconds between readings |
+| `PUBLISH_TO_GATEWAY` | `false` | Enable publishing to API Gateway |
+| `API_GATEWAY_URL` | `http://localhost:8080` | API Gateway base URL |
+| `API_GATEWAY_JWT` | `` | Bearer JWT for gateway auth |
+| `ENGINEERING_AUTH_SIGNATURE` | `simulated-signature` | Signature required by gateway |
 
 ### Command Line Options
 
@@ -51,6 +55,31 @@ uv run python simulator.py --disable-influxdb
 - `--disable-ieee2030-5`: Disable IEEE 2030.5 Smart Energy Profile support
 - `--ieee2030-5-port`: Port for IEEE 2030.5 server (default: 8443)
 - `--disable-influxdb`: Disable InfluxDB data storage
+- `--enable-gateway-publish`: Enable publishing readings to API Gateway
+- `--gateway-url`: API Gateway base URL (e.g., `http://localhost:8080`)
+- `--gateway-jwt`: JWT token for API Gateway Authorization header
+- `--engineering-signature`: Engineering authority signature (gateway validation)
+
+### Publish readings to API Gateway
+
+Example (dev defaults):
+
+```bash
+API_GATEWAY_JWT="<jwt>" \
+PUBLISH_TO_GATEWAY=true \
+API_GATEWAY_URL="http://localhost:8080" \
+uv run python simulator.py --simulation-interval 30
+```
+
+Or via flags:
+
+```bash
+uv run python simulator.py \
+  --enable-gateway-publish \
+  --gateway-url http://localhost:8080 \
+  --gateway-jwt "<jwt>" \
+  --simulation-interval 30
+```
 
 ## API Endpoints
 

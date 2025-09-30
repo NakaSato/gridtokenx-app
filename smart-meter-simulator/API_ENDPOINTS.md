@@ -1,12 +1,100 @@
 # GridTokenX Smart Meter Simulator API Documentation
 
-## Overview
+##    • Self-Sufficiency: 70.5%
+
+🚀 Continuing to start the full simulator...
+🏫 UTCC University GridTokenX Smart Meter Simulator
+============================================================
+✅ Simulator started successfully!
+📊 Managing 25 smart meters
+🌐 API Server: http://localhost:4040
+```rview
 
 The GridTokenX Smart Meter Simulator provides a comprehensive REST API for accessing real-time smart meter data from the 25-meter UTCC University campus simulation.
 
 **Base URL**: `http://localhost:4040` (default port)
 **Content Type**: `application/json`
 **Authentication**: None required
+
+## Command-Line Usage
+
+The simulator can be run in different modes using command-line options:
+
+### Generate Energy Data (One-time Display)
+Generate and display current energy data for all meters, then continue running the full simulator:
+
+```bash
+# Generate energy data and continue running simulator
+python simulator.py --generate-energy-data
+
+# Use custom config file
+python simulator.py --generate-energy-data --config-file path/to/config.json
+```
+
+This command:
+- Generates readings for all 25 meters at the current time
+- Displays a formatted table with consumption, generation, and grid feed-in data
+- Shows campus-wide energy summary statistics
+- **Continues to start the full simulator** with API server and real-time data collection
+- Useful for immediate verification of energy data before normal operation
+
+**Example Output**:
+```
+🏫 UTCC University GridTokenX Smart Meter Simulator
+============================================================
+Generating current energy data for all meters...
+============================================================
+
+📊 Generated 25 meter readings at 2024-09-30 12:00:00 UTC
+
+========================================================================================================================
+Meter ID                  Building     Type       Phase        Consumption  Generation   Grid Feed-in Solar    Battery
+========================================================================================================================
+AMI_METER_UTCC_001        Engineering Building A prosumer   3-phase      78.79        89.10        10.30        Yes      Yes
+...
+========================================================================================================================
+TOTALS                                                         2288.38      1613.98      153.81
+
+📈 Campus Energy Summary:
+   • Total Meters: 25
+   • Prosumers: 15 | Consumers: 10
+   • 3-Phase: 15 | Single-Phase: 10
+   • Total Consumption: 2288.38 kW
+   • Total Generation: 1613.98 kW
+   • Net Balance: -674.40 kW (Deficit)
+   • Grid Feed-in: 153.81 kW
+   • Self-Sufficiency: 70.5%
+
+🚀 Continuing to start the full simulator...
+🏫 UTCC University GridTokenX Smart Meter Simulator
+============================================================
+✅ Simulator started successfully!
+📊 Managing 25 smart meters
+🌐 API Server: http://localhost:4040
+```
+```
+
+### Run Full Simulator
+Start the complete simulator with API server and real-time data collection:
+
+```bash
+# Start with default settings
+python simulator.py
+
+# Disable optional features
+python simulator.py --disable-ieee2030-5 --disable-influxdb
+
+# Use custom config and ports
+python simulator.py --config-file custom_config.json --ieee2030-5-port 8444
+```
+
+### Available Options
+- `--config-file`: Path to campus configuration file (default: `config/utcc_campus_config.json`)
+- `--generate-energy-data`: Generate and display energy data, then continue running simulator
+- `--simulation-interval`: Interval in seconds between data collection cycles (default: 30, recommended: 30-300)
+- `--disable-ieee2030-5`: Disable IEEE 2030.5 Smart Energy Profile support
+- `--ieee2030-5-port`: Port for IEEE 2030.5 server (default: 8443)
+- `--disable-influxdb`: Disable InfluxDB data storage
 
 ## API Endpoints
 
@@ -38,6 +126,7 @@ Returns configuration and status information for all 25 smart meters.
     "building": "Engineering Building A",
     "floor": 1,
     "type": "prosumer",
+    "phase_type": "3-phase",
     "capacity_kw": 150.0,
     "has_solar": true,
     "has_battery": true,
@@ -60,6 +149,7 @@ Returns the most recent energy readings from all 25 meters.
     "building": "Engineering Building A",
     "floor": 1,
     "meter_type": "prosumer",
+    "phase_type": "3-phase",
     "energy_consumed": 125.3,
     "energy_generated": 45.7,
     "voltage": 228.5,
@@ -90,6 +180,7 @@ Returns the latest reading for a specific meter.
   "building": "Engineering Building A",
   "floor": 1,
   "meter_type": "prosumer",
+  "phase_type": "3-phase",
   "energy_consumed": 125.3,
   "energy_generated": 45.7,
   "voltage": 228.5,
@@ -126,6 +217,8 @@ Returns aggregated energy statistics for the entire campus.
   "total_grid_feed_in": 234.2,
   "prosumer_count": 16,
   "consumer_count": 9,
+  "three_phase_count": 15,
+  "single_phase_count": 10,
   "meters_with_solar": 16,
   "meters_with_battery": 11,
   "average_battery_level": 68.5
@@ -200,7 +293,155 @@ Returns information about active WebSocket connections.
 }
 ```
 
-### 9. IEEE 2030.5 Status (Optional)
+### 9. Test Energy Generation
+**GET** `/api/test/energy-generation`
+
+Runs a test to verify that prosumers generate energy during daytime hours while consumers do not.
+
+**Response**:
+```json
+{
+  "test_type": "energy_generation_test",
+  "timestamp": "2025-09-30T10:30:15.000Z",
+  "prosumer_generation": 1574.9,
+  "consumer_generation": 0.0,
+  "prosumer_count": 15,
+  "consumer_count": 10,
+  "generating_prosumers": 15,
+  "test_passed": true,
+  "message": "✅ Prosumers generate energy, consumers do not"
+}
+```
+
+### 10. Test Daytime Generation Curve
+**GET** `/api/test/daytime-generation`
+
+Tests solar generation curve across the full daytime period (9 AM - 5 PM) to verify realistic solar irradiance patterns.
+
+**Response**:
+```json
+{
+  "test_type": "daytime_generation_curve",
+  "timestamp": "2025-09-30T10:30:15.000Z",
+  "hourly_data": [
+    {
+      "hour": 9,
+      "time": " 9:00 AM",
+      "total_generation": 234.5
+    }
+  ],
+  "peak_generation": {
+    "hour": 12,
+    "time": "12:00 PM",
+    "total_generation": 1604.8
+  },
+  "average_hourly_generation": 1203.7,
+  "estimated_daily_generation": 18055.5,
+  "test_passed": true,
+  "message": "✅ Peak generation: 12:00 PM - 1604.8 kW"
+}
+```
+
+### 11. Analyze Energy Balance
+**GET** `/api/analyze/energy-balance`
+
+Analyzes the current campus energy balance, including consumption, generation, and self-sufficiency metrics.
+
+**Response**:
+```json
+{
+  "analysis_type": "campus_energy_balance",
+  "timestamp": "2025-09-30T10:30:15.000Z",
+  "overall_balance": {
+    "total_consumption": 2456.8,
+    "total_generation": 1876.3,
+    "total_grid_feed_in": 234.2,
+    "net_balance": -580.5,
+    "self_sufficiency_ratio": 0.764
+  },
+  "by_meter_type": {
+    "prosumers": {
+      "count": 15,
+      "consumption": 1567.3,
+      "generation": 1876.3,
+      "net_contribution": 309.0
+    },
+    "consumers": {
+      "count": 10,
+      "consumption": 889.5,
+      "generation": 0,
+      "net_contribution": -889.5
+    }
+  },
+  "by_phase_type": {
+    "three_phase": {
+      "count": 15,
+      "consumption": 1789.2,
+      "generation": 1345.6
+    },
+    "single_phase": {
+      "count": 10,
+      "consumption": 667.6,
+      "generation": 530.7
+    }
+  },
+  "battery_status": {
+    "meters_with_battery": 11,
+    "average_battery_level": 68.5
+  }
+}
+```
+
+### 12. Run Diagnostic Tests
+**GET** `/api/diagnostic/tests`
+
+Runs comprehensive diagnostic tests on the simulator including energy generation, daytime curves, and energy balance analysis.
+
+**Response**:
+```json
+{
+  "diagnostic_type": "comprehensive_simulator_test",
+  "timestamp": "2025-09-30T10:30:15.000Z",
+  "tests_run": {
+    "energy_generation": {
+      "test_type": "energy_generation_test",
+      "prosumer_generation": 1574.9,
+      "consumer_generation": 0.0,
+      "test_passed": true,
+      "message": "✅ Prosumers generate energy, consumers do not"
+    },
+    "daytime_generation": {
+      "test_type": "daytime_generation_curve",
+      "peak_generation": {
+        "total_generation": 1604.8
+      },
+      "test_passed": true,
+      "message": "✅ Peak generation: 12:00 PM - 1604.8 kW"
+    },
+    "energy_balance": {
+      "analysis_type": "campus_energy_balance",
+      "overall_balance": {
+        "net_balance": -580.5
+      }
+    }
+  },
+  "summary": {
+    "total_tests": 3,
+    "passed_tests": 2,
+    "failed_tests": 0,
+    "success_rate": 1.0,
+    "overall_status": "✅ All tests passed"
+  },
+  "simulator_status": {
+    "meters_active": 25,
+    "websocket_connections": 0,
+    "influxdb_enabled": true,
+    "ieee2030_5_enabled": true
+  }
+}
+```
+
+### 13. IEEE 2030.5 Status (Optional)
 **GET** `/api/ieee2030_5/status`
 
 Returns the status of IEEE 2030.5 protocol implementation (only available if enabled).
@@ -223,7 +464,7 @@ Returns the status of IEEE 2030.5 protocol implementation (only available if ena
 }
 ```
 
-### 10. IEEE 2030.5 Clients (Optional)
+### 14. IEEE 2030.5 Clients (Optional)
 **GET** `/api/ieee2030_5/clients`
 
 Returns information about connected IEEE 2030.5 clients (only available if enabled).
@@ -249,7 +490,7 @@ Returns information about connected IEEE 2030.5 clients (only available if enabl
 }
 ```
 
-### 11. API Documentation Page
+### 15. API Documentation Page
 **GET** `/`
 
 Returns an HTML page with interactive API documentation and links to all endpoints.
@@ -261,6 +502,7 @@ Returns an HTML page with interactive API documentation and links to all endpoin
 - `building`: Building name where meter is located
 - `floor`: Floor number within the building
 - `type`: Meter type ("prosumer" or "consumer")
+- `phase_type`: Electrical phase configuration ("3-phase" or "single-phase")
 - `capacity_kw`: Maximum power capacity in kilowatts
 - `has_solar`: Boolean indicating solar panel installation
 - `has_battery`: Boolean indicating battery storage
@@ -272,6 +514,7 @@ Returns an HTML page with interactive API documentation and links to all endpoin
 - `building`: Building name
 - `floor`: Floor number
 - `meter_type`: Meter type
+- `phase_type`: Electrical phase configuration
 - `energy_consumed`: Energy consumption in kW
 - `energy_generated`: Energy generation in kW (solar)
 - `voltage`: Voltage in volts
@@ -404,12 +647,60 @@ No rate limiting is currently implemented. The simulator updates readings every 
 - **Connection Status**: Monitor active connections via `/api/websocket/status`
 - **Ping/Pong**: Use ping messages to maintain connection health
 
-## Notes
+## WebSocket Best Practices
 
-- All timestamps are in UTC and ISO 8601 format
-- Energy values are in kilowatts (kW)
-- The simulator runs continuously and updates readings in real-time
-- IEEE 2030.5 endpoints are only available when the protocol is enabled
-- All endpoints support CORS for web application integration
-- WebSocket connections automatically receive data every simulation interval (default: 15 seconds)
-- WebSocket clients should handle reconnection logic for production use
+### Real-Time Data Intervals
+
+The simulator supports configurable update intervals to balance real-time monitoring with system performance:
+
+**Recommended Intervals by Use Case:**
+- **Real-time monitoring dashboards**: 30-60 seconds
+- **Operational control rooms**: 15-30 seconds  
+- **Data analytics platforms**: 60-300 seconds
+- **Mobile applications**: 60-120 seconds (battery considerations)
+- **Archival/long-term storage**: 300-900 seconds
+
+**Performance Guidelines:**
+- **< 15 seconds**: High server load, increased bandwidth usage
+- **15-60 seconds**: Good balance of real-time updates and performance
+- **60-300 seconds**: Reduced server load, suitable for most applications
+- **> 300 seconds**: Minimal real-time value, consider polling instead
+
+**Example Usage:**
+```bash
+# Real-time dashboard (30 second updates)
+python simulator.py --simulation-interval 30
+
+# Mobile app (60 second updates)
+python simulator.py --simulation-interval 60
+
+# Analytics platform (5 minute updates)
+python simulator.py --simulation-interval 300
+```
+
+### Connection Management
+
+**Client-Side Best Practices:**
+- Implement automatic reconnection with exponential backoff
+- Handle connection drops gracefully
+- Limit concurrent WebSocket connections per client
+- Use connection pooling for multiple data streams
+
+**Server-Side Optimizations:**
+- Clean up dead connections automatically
+- Monitor connection count and resource usage
+- Implement rate limiting if needed
+- Use efficient JSON serialization
+
+### Data Volume Considerations
+
+**Message Size Optimization:**
+- Large datasets (25+ meters) create substantial network traffic
+- Consider selective subscriptions for specific meters/buildings
+- Compress messages for mobile clients
+- Implement pagination for historical data
+
+**Battery Life (Mobile Clients):**
+- Longer intervals reduce battery drain
+- Use push notifications for critical alerts instead of constant streaming
+- Allow users to configure update frequency

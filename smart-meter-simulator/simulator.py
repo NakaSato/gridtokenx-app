@@ -15,8 +15,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 from dataclasses import dataclass, asdict
 import asyncio
-from aiohttp import web, WSMsgType
+from aiohttp import web, WSMsgType, ClientSession, TCPConnector, ClientTimeout
 from dotenv import load_dotenv
+from unittest.mock import patch
 
 # InfluxDB imports (optional)
 try:
@@ -173,10 +174,27 @@ class SmartMeter:
             f"Phase: {self.phase_type}, Solar: {self.has_solar}, Battery: {self.has_battery}"
         )
 
-    def generate_reading(self) -> MeterReading:
-        """Generate realistic meter reading based on time of day"""
+    def generate_reading(self, use_local_time: bool = False, force_daylight: bool = False) -> MeterReading:
+        """Generate realistic meter reading based on time of day
+        
+        Args:
+            use_local_time: If True, use local timezone instead of UTC for solar calculations
+            force_daylight: If True, force peak solar generation (simulate noon)
+        """
         now = datetime.now(timezone.utc)
-        hour = now.hour
+        
+        # Force daylight time (simulate noon for testing)
+        if force_daylight:
+            hour = 12  # Peak solar generation at noon
+        # Use local time for solar generation if specified (better for testing)
+        elif use_local_time:
+            # Get local time (UTC+7 for Thailand)
+            local_offset = int(os.getenv("LOCAL_TIMEZONE_OFFSET", "7"))
+            from datetime import timedelta
+            local_now = now + timedelta(hours=local_offset)
+            hour = local_now.hour
+        else:
+            hour = now.hour
 
         # Base consumption pattern (varies by time of day)
         if 6 <= hour < 9:  # Morning peak
@@ -194,7 +212,7 @@ class SmartMeter:
         # Solar generation (if applicable)
         generation = 0.0
         if self.has_solar:
-            if 6 <= hour < 18:  # Daylight hours
+            if 6 <= hour < 18:  # Daylight hours (6 AM - 6 PM)
                 solar_factor = (
                     min(1.0, (hour - 6) / 6) if hour < 12 else max(0, (18 - hour) / 6)
                 )
@@ -247,12 +265,16 @@ class SmartMeter:
 class CampusNetworkSimulator:
     """UTCC Campus Network Simulator managing all 25 meters"""
 
-    def __init__(self, config_file: str):
+    def __init__(self, config_file: str, force_daylight: bool = False, use_local_time: bool = True):
         self.config = self._load_config(config_file)
         self.meters: List[SmartMeter] = []
         self.is_running = False
         self.readings_buffer: List[Dict] = []
         self.api_server = None
+        
+        # Solar generation configuration
+        self.force_daylight = force_daylight
+        self.use_local_time = use_local_time
 
         # Initialize WebSocket manager
         self.websocket_manager = WebSocketManager()
@@ -261,6 +283,14 @@ class CampusNetworkSimulator:
         self.influx_client = None
         self.write_api = None
         self._init_influxdb()
+
+        # API Gateway publishing configuration
+        self.gateway_enabled = os.getenv("PUBLISH_TO_GATEWAY", "false").lower() in ("true", "1", "yes", "on")
+        self.gateway_url = os.getenv("API_GATEWAY_URL", "http://localhost:8080")
+        self.gateway_jwt = os.getenv("API_GATEWAY_JWT", "")
+        self.gateway_timeout = int(os.getenv("API_GATEWAY_TIMEOUT", "10"))
+        self.engineering_signature = os.getenv("ENGINEERING_AUTH_SIGNATURE", "simulated-signature")
+        self.gateway_session: Optional[ClientSession] = None
 
         # Initialize IEEE 2030.5 components
         self.ieee2030_5_enabled = False
@@ -436,21 +466,21 @@ class CampusNetworkSimulator:
                     .tag("floor", str(reading["floor"]))
                     .tag("meter_type", reading["meter_type"])
                     .tag("phase_type", reading["phase_type"])
-                    .field("energy_consumed", reading["energy_consumed"])
-                    .field("energy_generated", reading["energy_generated"])
-                    .field("voltage", reading["voltage"])
-                    .field("current", reading["current"])
-                    .field("power_factor", reading["power_factor"])
-                    .field("temperature", reading["temperature"])
-                    .field("humidity", reading["humidity"]))
+                    .field("energy_consumed", float(reading["energy_consumed"]))
+                    .field("energy_generated", float(reading["energy_generated"]))
+                    .field("voltage", float(reading["voltage"]))
+                    .field("current", float(reading["current"]))
+                    .field("power_factor", float(reading["power_factor"]))
+                    .field("temperature", float(reading["temperature"]))
+                    .field("humidity", float(reading["humidity"])))
 
-                # Optional fields
+                # Optional fields - ensure all are floats for consistency
                 if reading.get("battery_level") is not None:
-                    point = point.field("battery_level", reading["battery_level"])
+                    point = point.field("battery_level", float(reading["battery_level"]))
                 if reading.get("solar_generation") is not None:
-                    point = point.field("solar_generation", reading["solar_generation"])
+                    point = point.field("solar_generation", float(reading["solar_generation"]))
                 if reading.get("grid_feed_in") is not None:
-                    point = point.field("grid_feed_in", reading["grid_feed_in"])
+                    point = point.field("grid_feed_in", float(reading["grid_feed_in"]))
 
                 # Set timestamp
                 timestamp = datetime.fromisoformat(reading["timestamp"].replace('Z', '+00:00'))
@@ -466,12 +496,69 @@ class CampusNetworkSimulator:
             logger.error(f"❌ Failed to send data to InfluxDB: {e}")
             raise  # Re-raise so calling code knows it failed
 
+    async def _ensure_gateway_session(self):
+        """Ensure an aiohttp session exists for API Gateway calls"""
+        if self.gateway_session is None or self.gateway_session.closed:
+            # Use a small connection pool; disable SSL verification only if necessary
+            self.gateway_session = ClientSession(connector=TCPConnector(ssl=False))
+
+    async def _publish_readings_to_gateway(self, readings: List[Dict]):
+        """Publish meter readings to API Gateway /api/v1/meters/readings"""
+        if not self.gateway_enabled:
+            return
+        if not self.gateway_jwt:
+            logger.warning("PUBLISH_TO_GATEWAY enabled but API_GATEWAY_JWT not set - skipping publish")
+            return
+
+        await self._ensure_gateway_session()
+
+        submit_url = self.gateway_url.rstrip("/") + "/api/v1/meters/readings"
+        headers = {
+            "Authorization": f"Bearer {self.gateway_jwt}",
+            "Content-Type": "application/json",
+        }
+
+        # Send one-by-one to keep server-side simple; could batch in future
+        for r in readings:
+            payload = {
+                "meter_id": r["meter_id"],
+                "timestamp": r["timestamp"],
+                "energy_generated": r.get("energy_generated", 0.0),
+                "energy_consumed": r.get("energy_consumed", 0.0),
+                "solar_irradiance": None,
+                "temperature": r.get("temperature"),
+                "engineering_authority_signature": self.engineering_signature,
+                "metadata": {
+                    "location": r.get("building", "unknown"),
+                    "device_type": r.get("meter_type", "smart_meter"),
+                    "weather_conditions": None,
+                },
+            }
+
+            try:
+                timeout = aiohttp.ClientTimeout(total=self.gateway_timeout)
+                async with self.gateway_session.post(submit_url, headers=headers, json=payload, timeout=timeout) as resp:
+                    if resp.status >= 200 and resp.status < 300:
+                        logger.debug(f"✅ Published reading for {r['meter_id']} to API Gateway")
+                    elif resp.status == 401:
+                        logger.error("❌ API Gateway unauthorized (401). Check API_GATEWAY_JWT")
+                        # Do not spam; break this cycle
+                        break
+                    else:
+                        text = await resp.text()
+                        logger.warning(f"⚠️ Failed to publish reading for {r['meter_id']}: {resp.status} {text}")
+            except Exception as e:
+                logger.error(f"❌ Exception publishing to API Gateway for meter {r.get('meter_id')}: {e}")
+
     async def collect_readings(self, simulation_interval: int = 15):
         """Collect readings from all meters periodically"""
         while self.is_running:
             readings = []
             for meter in self.meters:
-                reading = meter.generate_reading()
+                reading = meter.generate_reading(
+                    use_local_time=self.use_local_time,
+                    force_daylight=self.force_daylight
+                )
                 readings.append(reading.to_dict())
 
                 # Send to IEEE 2030.5 if enabled
@@ -518,6 +605,12 @@ class CampusNetworkSimulator:
                     else 0,
                 }
                 await self.websocket_manager.broadcast_summary(summary)
+
+            # Publish to API Gateway (best effort; non-blocking for failures)
+            try:
+                await self._publish_readings_to_gateway(readings)
+            except Exception as e:
+                logger.error(f"Failed to publish readings to API Gateway: {e}")
 
             # Always attempt to send to InfluxDB (data persistence is critical)
             try:
@@ -745,6 +838,222 @@ class CampusNetworkSimulator:
 
         return websocket
 
+    async def test_energy_generation(self) -> Dict:
+        """Test prosumer energy generation during daytime hours"""
+        logger.info("Running energy generation test...")
+
+        # Create test datetime for noon (peak solar generation)
+        test_datetime = datetime(2024, 9, 30, 12, 0, 0, tzinfo=timezone.utc)
+
+        # Test generation with mocked time
+        prosumer_generation = []
+        consumer_generation = []
+
+        with patch('simulator.datetime') as mock_datetime:
+            mock_datetime.now.return_value = test_datetime
+            mock_datetime.fromtimestamp = datetime.fromtimestamp
+            mock_datetime.fromisoformat = datetime.fromisoformat
+
+            for meter in self.meters:
+                reading = meter.generate_reading()
+                if meter.meter_type == "prosumer":
+                    prosumer_generation.append(reading.energy_generated)
+                else:
+                    consumer_generation.append(reading.energy_generated)
+
+        total_prosumer_gen = sum(prosumer_generation)
+        total_consumer_gen = sum(consumer_generation)
+        prosumer_count = len([m for m in self.meters if m.meter_type == "prosumer"])
+        consumer_count = len([m for m in self.meters if m.meter_type == "consumer"])
+
+        result = {
+            "test_type": "energy_generation_test",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "prosumer_generation": total_prosumer_gen,
+            "consumer_generation": total_consumer_gen,
+            "prosumer_count": prosumer_count,
+            "consumer_count": consumer_count,
+            "generating_prosumers": sum(1 for g in prosumer_generation if g > 0),
+            "test_passed": total_prosumer_gen > 0 and total_consumer_gen == 0,
+            "message": "✅ Prosumers generate energy, consumers do not" if (total_prosumer_gen > 0 and total_consumer_gen == 0) else "❌ Generation test failed"
+        }
+
+        logger.info(f"Energy generation test result: {result['message']}")
+        return result
+
+    async def test_daytime_generation_curve(self) -> Dict:
+        """Test solar generation curve across full daytime period (9 AM - 5 PM)"""
+        logger.info("Running daytime generation curve test...")
+
+        # Test hours from 9 AM to 5 PM
+        daytime_hours = list(range(9, 18))  # 9 to 17 (5 PM)
+        hourly_results = []
+
+        for hour in daytime_hours:
+            test_datetime = datetime(2024, 9, 30, hour, 0, 0, tzinfo=timezone.utc)
+
+            with patch('simulator.datetime') as mock_datetime:
+                mock_datetime.now.return_value = test_datetime
+                mock_datetime.fromtimestamp = datetime.fromtimestamp
+                mock_datetime.fromisoformat = datetime.fromisoformat
+
+                total_generation = sum(meter.generate_reading().energy_generated for meter in self.meters)
+                hourly_results.append({
+                    "hour": hour,
+                    "time": f"{hour:2d}:00{' PM' if hour > 12 else ' AM'}",
+                    "total_generation": total_generation
+                })
+
+        # Calculate statistics
+        peak_generation = max(hourly_results, key=lambda x: x['total_generation'])
+        avg_generation = sum(r['total_generation'] for r in hourly_results) / len(hourly_results)
+        estimated_daily = avg_generation * 8  # 8 hours of generation
+
+        result = {
+            "test_type": "daytime_generation_curve",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "hourly_data": hourly_results,
+            "peak_generation": peak_generation,
+            "average_hourly_generation": avg_generation,
+            "estimated_daily_generation": estimated_daily,
+            "test_passed": peak_generation['total_generation'] > 0,
+            "message": f"✅ Peak generation: {peak_generation['time']} - {peak_generation['total_generation']:.1f} kW"
+        }
+
+        logger.info(f"Daytime generation curve test completed: {result['message']}")
+        return result
+
+    async def analyze_campus_energy_balance(self) -> Dict:
+        """Analyze current campus energy balance"""
+        if not self.readings_buffer:
+            # Generate a reading to analyze
+            logger.info("No readings available, generating current reading for analysis...")
+            readings = []
+            for meter in self.meters:
+                reading = meter.generate_reading()
+                readings.append(reading.to_dict())
+        else:
+            readings = self.readings_buffer
+
+        # Calculate totals
+        total_consumption = sum(r["energy_consumed"] for r in readings)
+        total_generation = sum(r["energy_generated"] for r in readings)
+        total_feed_in = sum(r["grid_feed_in"] for r in readings)
+
+        # Calculate net energy balance
+        net_balance = total_generation - total_consumption
+
+        # Analyze by meter type
+        prosumer_readings = [r for r in readings if r["meter_type"] == "prosumer"]
+        consumer_readings = [r for r in readings if r["meter_type"] == "consumer"]
+
+        prosumer_consumption = sum(r["energy_consumed"] for r in prosumer_readings)
+        prosumer_generation = sum(r["energy_generated"] for r in prosumer_readings)
+        consumer_consumption = sum(r["energy_consumed"] for r in consumer_readings)
+
+        # Phase analysis
+        three_phase_readings = [r for r in readings if r["phase_type"] == "3-phase"]
+        single_phase_readings = [r for r in readings if r["phase_type"] == "single-phase"]
+
+        result = {
+            "analysis_type": "campus_energy_balance",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "overall_balance": {
+                "total_consumption": total_consumption,
+                "total_generation": total_generation,
+                "total_grid_feed_in": total_feed_in,
+                "net_balance": net_balance,
+                "self_sufficiency_ratio": (total_generation / total_consumption) if total_consumption > 0 else 0
+            },
+            "by_meter_type": {
+                "prosumers": {
+                    "count": len(prosumer_readings),
+                    "consumption": prosumer_consumption,
+                    "generation": prosumer_generation,
+                    "net_contribution": prosumer_generation - prosumer_consumption
+                },
+                "consumers": {
+                    "count": len(consumer_readings),
+                    "consumption": consumer_consumption,
+                    "generation": 0,
+                    "net_contribution": -consumer_consumption
+                }
+            },
+            "by_phase_type": {
+                "three_phase": {
+                    "count": len(three_phase_readings),
+                    "consumption": sum(r["energy_consumed"] for r in three_phase_readings),
+                    "generation": sum(r["energy_generated"] for r in three_phase_readings)
+                },
+                "single_phase": {
+                    "count": len(single_phase_readings),
+                    "consumption": sum(r["energy_consumed"] for r in single_phase_readings),
+                    "generation": sum(r["energy_generated"] for r in single_phase_readings)
+                }
+            },
+            "battery_status": {
+                "meters_with_battery": sum(1 for m in self.meters if m.has_battery),
+                "average_battery_level": sum(
+                    m.battery_level for m in self.meters if m.battery_level
+                ) / sum(1 for m in self.meters if m.battery_level)
+                if any(m.battery_level for m in self.meters)
+                else 0
+            }
+        }
+
+        logger.info(f"Campus energy balance analysis completed: Net balance = {net_balance:.2f} kW")
+        return result
+
+    async def run_diagnostic_tests(self) -> Dict:
+        """Run comprehensive diagnostic tests on the simulator"""
+        logger.info("Running comprehensive diagnostic tests...")
+
+        tests = {}
+
+        # Test 1: Energy generation test
+        try:
+            tests["energy_generation"] = await self.test_energy_generation()
+        except Exception as e:
+            tests["energy_generation"] = {"error": str(e), "test_passed": False}
+
+        # Test 2: Daytime generation curve
+        try:
+            tests["daytime_generation"] = await self.test_daytime_generation_curve()
+        except Exception as e:
+            tests["daytime_generation"] = {"error": str(e), "test_passed": False}
+
+        # Test 3: Current energy balance
+        try:
+            tests["energy_balance"] = await self.analyze_campus_energy_balance()
+        except Exception as e:
+            tests["energy_balance"] = {"error": str(e)}
+
+        # Overall test results
+        passed_tests = sum(1 for test in tests.values() if test.get("test_passed", False))
+        total_tests = len([t for t in tests.values() if "test_passed" in t])
+
+        result = {
+            "diagnostic_type": "comprehensive_simulator_test",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "tests_run": tests,
+            "summary": {
+                "total_tests": total_tests,
+                "passed_tests": passed_tests,
+                "failed_tests": total_tests - passed_tests,
+                "success_rate": (passed_tests / total_tests) if total_tests > 0 else 0,
+                "overall_status": "✅ All tests passed" if passed_tests == total_tests else f"⚠️ {total_tests - passed_tests} test(s) failed"
+            },
+            "simulator_status": {
+                "meters_active": len(self.meters),
+                "websocket_connections": len(self.websocket_manager.connections),
+                "influxdb_enabled": self.write_api is not None,
+                "ieee2030_5_enabled": self.ieee2030_5_enabled
+            }
+        }
+
+        logger.info(f"Diagnostic tests completed: {result['summary']['overall_status']}")
+        return result
+
     async def handle_websocket_status(self, request):
         """Get WebSocket connection status"""
         return web.json_response({
@@ -753,6 +1062,42 @@ class CampusNetworkSimulator:
             "simulation_interval": self.simulation_interval,
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
+
+    async def handle_test_energy_generation(self, request):
+        """Run energy generation test"""
+        try:
+            result = await self.test_energy_generation()
+            return web.json_response(result)
+        except Exception as e:
+            logger.error(f"Energy generation test failed: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def handle_test_daytime_generation(self, request):
+        """Run daytime generation curve test"""
+        try:
+            result = await self.test_daytime_generation_curve()
+            return web.json_response(result)
+        except Exception as e:
+            logger.error(f"Daytime generation test failed: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def handle_analyze_energy_balance(self, request):
+        """Analyze current campus energy balance"""
+        try:
+            result = await self.analyze_campus_energy_balance()
+            return web.json_response(result)
+        except Exception as e:
+            logger.error(f"Energy balance analysis failed: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def handle_run_diagnostic_tests(self, request):
+        """Run comprehensive diagnostic tests"""
+        try:
+            result = await self.run_diagnostic_tests()
+            return web.json_response(result)
+        except Exception as e:
+            logger.error(f"Diagnostic tests failed: {e}")
+            return web.json_response({"error": str(e)}, status=500)
 
     async def setup_api_server(self, app):
         """Setup API routes"""
@@ -766,6 +1111,12 @@ class CampusNetworkSimulator:
         app.router.add_get("/ws/readings", self.handle_websocket_readings)
         app.router.add_get("/ws/summary", self.handle_websocket_summary)
         app.router.add_get("/api/websocket/status", self.handle_websocket_status)
+
+        # Testing and diagnostic endpoints
+        app.router.add_get("/api/test/energy-generation", self.handle_test_energy_generation)
+        app.router.add_get("/api/test/daytime-generation", self.handle_test_daytime_generation)
+        app.router.add_get("/api/analyze/energy-balance", self.handle_analyze_energy_balance)
+        app.router.add_get("/api/diagnostic/tests", self.handle_run_diagnostic_tests)
 
         # IEEE 2030.5 endpoints (if enabled)
         if self.ieee2030_5_enabled:
@@ -841,6 +1192,26 @@ class CampusNetworkSimulator:
                 <a href="{base_url}/api/websocket/status" class="path">/api/websocket/status</a> 
                 <span class="description">- WebSocket connection status</span>
             </div>
+            <div class="endpoint">
+                <span class="method">GET</span> 
+                <a href="{base_url}/api/test/energy-generation" class="path">/api/test/energy-generation</a> 
+                <span class="description">- Test prosumer energy generation</span>
+            </div>
+            <div class="endpoint">
+                <span class="method">GET</span> 
+                <a href="{base_url}/api/test/daytime-generation" class="path">/api/test/daytime-generation</a> 
+                <span class="description">- Test daytime generation curve (9 AM - 5 PM)</span>
+            </div>
+            <div class="endpoint">
+                <span class="method">GET</span> 
+                <a href="{base_url}/api/analyze/energy-balance" class="path">/api/analyze/energy-balance</a> 
+                <span class="description">- Analyze campus energy balance</span>
+            </div>
+            <div class="endpoint">
+                <span class="method">GET</span> 
+                <a href="{base_url}/api/diagnostic/tests" class="path">/api/diagnostic/tests</a> 
+                <span class="description">- Run comprehensive diagnostic tests</span>
+            </div>
             {f'''
             <div class="endpoint">
                 <span class="method">GET</span> 
@@ -865,13 +1236,13 @@ class CampusNetworkSimulator:
         """
         return web.Response(text=html_content, content_type="text/html")
 
-    async def start(self):
+    async def start(self, simulation_interval: int = 30):
         """Start the campus network simulator"""
         self.is_running = True
 
         # Load configuration from environment
         self.api_port = int(os.getenv("API_PORT", "4040"))
-        self.simulation_interval = int(os.getenv("SIMULATION_INTERVAL", "15"))
+        self.simulation_interval = simulation_interval
 
         # Start IEEE 2030.5 server if enabled
         if self.ieee2030_5_enabled and self.ieee2030_5_server:
@@ -967,6 +1338,112 @@ class CampusNetworkSimulator:
             meter.stop()
         logger.info("Campus Network Simulator stopped")
 
+        # Close API Gateway session
+        if self.gateway_session and not self.gateway_session.closed:
+            try:
+                asyncio.create_task(self.gateway_session.close())
+            except Exception:
+                pass
+
+
+async def generate_energy_data_now(config_file: str, use_local_time: bool = True, force_daylight: bool = False):
+    """Generate and display current energy data for all meters
+    
+    Args:
+        config_file: Path to configuration file
+        use_local_time: Use local timezone for solar generation (default: True)
+        force_daylight: Force peak solar generation (simulate noon)
+    """
+    print("\n🏫 UTCC University GridTokenX Smart Meter Simulator")
+    print("=" * 60)
+    print("Generating current energy data for all meters...")
+    
+    # Show timezone info
+    from datetime import timedelta
+    now_utc = datetime.now(timezone.utc)
+    if force_daylight:
+        print(f"🌞 FORCING DAYLIGHT MODE: Simulating PEAK solar generation (12:00 noon)")
+        print(f"   Actual time: {now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    elif use_local_time:
+        local_offset = int(os.getenv("LOCAL_TIMEZONE_OFFSET", "7"))
+        local_now = now_utc + timedelta(hours=local_offset)
+        print(f"Using LOCAL TIME for solar generation: {local_now.strftime('%Y-%m-%d %H:%M:%S')} (UTC+{local_offset})")
+    else:
+        print(f"Using UTC TIME for solar generation: {now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    print("=" * 60)
+
+    # Create simulator instance (without starting the full server)
+    simulator = CampusNetworkSimulator(
+        config_file,
+        force_daylight=force_daylight,
+        use_local_time=use_local_time
+    )
+
+    # Generate readings for all meters
+    readings = []
+    for meter in simulator.meters:
+        reading = meter.generate_reading(use_local_time=use_local_time, force_daylight=force_daylight)
+        readings.append(reading.to_dict())
+
+    # Display results
+    print(f"\n📊 Generated {len(readings)} meter readings at {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    print("\n" + "=" * 120)
+    print(f"{'Meter ID':<25} {'Building':<12} {'Type':<10} {'Phase':<12} {'Consumption':<12} {'Generation':<12} {'Grid Feed-in':<12} {'Solar':<8} {'Battery':<8}")
+    print("=" * 120)
+
+    total_consumption = 0
+    total_generation = 0
+    total_feed_in = 0
+    prosumer_count = 0
+    consumer_count = 0
+    three_phase_count = 0
+    single_phase_count = 0
+
+    for reading in readings:
+        meter_id = reading['meter_id']
+        building = reading['building']
+        meter_type = reading['meter_type']
+        phase_type = reading['phase_type']
+        consumption = reading['energy_consumed']
+        generation = reading['energy_generated']
+        feed_in = reading['grid_feed_in']
+        solar = "Yes" if reading.get('solar_generation') else "No"
+        battery = "Yes" if reading.get('battery_level') else "No"
+
+        print(f"{meter_id:<25} {building:<12} {meter_type:<10} {phase_type:<12} {consumption:<12.2f} {generation:<12.2f} {feed_in:<12.2f} {solar:<8} {battery:<8}")
+
+        total_consumption += consumption
+        total_generation += generation
+        total_feed_in += feed_in
+
+        if meter_type == "prosumer":
+            prosumer_count += 1
+        else:
+            consumer_count += 1
+
+        if phase_type == "3-phase":
+            three_phase_count += 1
+        else:
+            single_phase_count += 1
+
+    print("=" * 120)
+    print(f"{'TOTALS':<25} {'':<12} {'':<10} {'':<12} {total_consumption:<12.2f} {total_generation:<12.2f} {total_feed_in:<12.2f}")
+    print()
+
+    # Summary statistics
+    net_balance = total_generation - total_consumption
+    print("📈 Campus Energy Summary:")
+    print(f"   • Total Meters: {len(readings)}")
+    print(f"   • Prosumers: {prosumer_count} | Consumers: {consumer_count}")
+    print(f"   • 3-Phase: {three_phase_count} | Single-Phase: {single_phase_count}")
+    print(f"   • Total Consumption: {total_consumption:.2f} kW")
+    print(f"   • Total Generation: {total_generation:.2f} kW")
+    print(f"   • Net Balance: {net_balance:.2f} kW ({'Surplus' if net_balance > 0 else 'Deficit'})")
+    print(f"   • Grid Feed-in: {total_feed_in:.2f} kW")
+    print(f"   • Self-Sufficiency: {(total_generation/total_consumption*100):.1f}%" if total_consumption > 0 else "   • Self-Sufficiency: N/A")
+
+    print("\n✅ Energy data generation completed!")
+
 
 async def main():
     """Main entry point"""
@@ -995,8 +1472,73 @@ async def main():
         action="store_true",
         help="Disable InfluxDB data storage (enabled by default)",
     )
+    parser.add_argument(
+        "--simulation-interval",
+        type=int,
+        default=30,
+        help="Interval in seconds between data collection cycles (default: 30, recommended: 30-300)",
+    )
+    parser.add_argument(
+        "--generate-energy-data",
+        action="store_true",
+        help="Generate and display current energy data for all meters before starting the simulator",
+    )
+    parser.add_argument(
+        "--use-utc-time",
+        action="store_true",
+        help="Use UTC time for solar generation instead of local time (default: use local time UTC+7)",
+    )
+    parser.add_argument(
+        "--force-daylight",
+        action="store_true",
+        help="Force peak solar generation (simulate 12:00 noon) - useful for testing at night",
+    )
+    parser.add_argument(
+        "--timezone-offset",
+        type=int,
+        default=7,
+        help="Local timezone offset from UTC in hours (default: 7 for Thailand/Bangkok)",
+    )
+    parser.add_argument(
+        "--enable-gateway-publish",
+        action="store_true",
+        help="Enable publishing readings to API Gateway (can also set PUBLISH_TO_GATEWAY=true)",
+    )
+    parser.add_argument(
+        "--gateway-url",
+        type=str,
+        default=None,
+        help="API Gateway base URL (e.g., http://localhost:8080)",
+    )
+    parser.add_argument(
+        "--gateway-jwt",
+        type=str,
+        default=None,
+        help="JWT token for API Gateway Authorization header",
+    )
+    parser.add_argument(
+        "--engineering-signature",
+        type=str,
+        default=None,
+        help="Engineering authority signature to satisfy gateway validation",
+    )
 
     args = parser.parse_args()
+
+    # Set timezone offset environment variable
+    os.environ["LOCAL_TIMEZONE_OFFSET"] = str(args.timezone_offset)
+
+    # Handle generate-energy-data command
+    if args.generate_energy_data:
+        # Priority: force_daylight > use_local_time > use_utc_time
+        force_daylight = args.force_daylight
+        use_local_time = not args.use_utc_time if not force_daylight else False
+        await generate_energy_data_now(
+            args.config_file, 
+            use_local_time=use_local_time,
+            force_daylight=force_daylight
+        )
+        print("\n🚀 Continuing to start the full simulator...\n")
 
     # Set environment variables based on command line args
     if args.disable_ieee2030_5:
@@ -1005,11 +1547,37 @@ async def main():
     if args.disable_influxdb:
         os.environ["INFLUXDB_ENABLED"] = "false"
 
+    if args.enable_gateway_publish:
+        os.environ["PUBLISH_TO_GATEWAY"] = "true"
+    if args.gateway_url:
+        os.environ["API_GATEWAY_URL"] = args.gateway_url
+    if args.gateway_jwt:
+        os.environ["API_GATEWAY_JWT"] = args.gateway_jwt
+    if args.engineering_signature:
+        os.environ["ENGINEERING_AUTH_SIGNATURE"] = args.engineering_signature
+
+    # Determine solar generation mode for the running simulator
+    force_daylight_mode = args.force_daylight
+    use_local_time_mode = not args.use_utc_time if not force_daylight_mode else False
+    
+    # Log the solar generation mode
+    if force_daylight_mode:
+        logger.info("🌞 Running simulator in FORCE DAYLIGHT mode (peak solar generation)")
+    elif use_local_time_mode:
+        local_offset = int(os.getenv("LOCAL_TIMEZONE_OFFSET", "7"))
+        logger.info(f"🌍 Running simulator with LOCAL TIME (UTC+{local_offset}) for solar generation")
+    else:
+        logger.info("🌐 Running simulator with UTC TIME for solar generation")
+
     # Create and start simulator
-    simulator = CampusNetworkSimulator(args.config_file)
+    simulator = CampusNetworkSimulator(
+        args.config_file,
+        force_daylight=force_daylight_mode,
+        use_local_time=use_local_time_mode
+    )
 
     try:
-        await simulator.start()
+        await simulator.start(args.simulation_interval)
     except KeyboardInterrupt:
         print("\n\nShutting down simulator...")
         simulator.stop()
