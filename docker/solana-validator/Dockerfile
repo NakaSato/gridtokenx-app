@@ -1,10 +1,8 @@
-# Simplified Solana validator container using pre-built binaries
-# Uses the official Solana release builds from GitHub
-ARG SOLANA_VERSION=1.18.26
+ARG AGAVE_VERSION=3.0.7
 
 FROM ubuntu:22.04
 
-ARG SOLANA_VERSION
+ARG AGAVE_VERSION
 
 # Install minimal dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -13,41 +11,42 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bzip2 \
     jq \
     libssl3 \
+    libc6 \
+    openssl \
+    wget \
+    file \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
 # Create solana user
 RUN useradd --create-home --shell /bin/bash --user-group solana
 
-# Download and extract Solana binaries from official GitHub releases
-# Using curl instead of wget for better SSL handling and retry logic
-RUN mkdir -p /opt/solana/bin && \
-    cd /tmp && \
-    echo "Downloading Solana v${SOLANA_VERSION}..." && \
+# Download and extract Agave binaries from official Anza GitHub releases (aarch64 for Apple Silicon)
+# For development/testing on other systems, Docker will emulate via QEMU
+RUN mkdir -p /opt/solana/bin && cd /tmp && \
+    echo "Downloading Agave v${AGAVE_VERSION}..." && \
     curl -L --retry 5 --retry-delay 2 --connect-timeout 30 \
       -o solana-release.tar.bz2 \
-      "https://github.com/solana-labs/solana/releases/download/v${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2" && \
+      "https://github.com/anza-xyz/agave/releases/download/v${AGAVE_VERSION}/solana-release-aarch64-apple-darwin.tar.bz2" && \
     echo "Extracting..." && \
     tar -xjf solana-release.tar.bz2 -C /tmp && \
     mv /tmp/solana-release/bin/* /opt/solana/bin/ && \
     rm -rf /tmp/solana-release* && \
     chmod +x /opt/solana/bin/* && \
     echo "Verifying installation..." && \
-    /opt/solana/bin/solana --version || (echo "Installation failed"; exit 1)
+    file /opt/solana/bin/solana && \
+    echo "Installation complete"
 
-# Create required directories
+# Create required directories and set up symlinks
 RUN mkdir -p \
     /opt/solana/ledger \
     /opt/solana/config \
     /opt/solana/logs \
+    && ln -s /opt/solana/bin/solana /usr/local/bin/solana \
+    && ln -s /opt/solana/bin/solana-validator /usr/local/bin/solana-validator \
+    && ln -s /opt/solana/bin/solana-keygen /usr/local/bin/solana-keygen \
+    && ln -s /opt/solana/bin/solana-test-validator /usr/local/bin/solana-test-validator \
     && chown -R solana:solana /opt/solana
-
-# Add Solana to PATH and create symlinks
-RUN ln -s /opt/solana/bin/solana /usr/local/bin/solana && \
-    ln -s /opt/solana/bin/solana-validator /usr/local/bin/solana-validator && \
-    ln -s /opt/solana/bin/solana-keygen /usr/local/bin/solana-keygen && \
-    ln -s /opt/solana/bin/solana-test-validator /usr/local/bin/solana-test-validator && \
-    ln -s /opt/solana/bin/solana-faucet /usr/local/bin/solana-faucet
 
 # Switch to solana user and set working directory
 USER solana

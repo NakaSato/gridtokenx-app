@@ -60,20 +60,6 @@ setup: ## Complete project setup (install + anchor setup + codama generation)
 	pnpm run codama:js
 	@echo "$(GREEN)✅ Project setup complete$(NC)"
 
-setup-minimal: ## Minimal setup (frontend + blockchain only)
-	@echo "$(GREEN)Running minimal project setup...$(NC)"
-	@echo "$(BLUE)Installing workspace dependencies...$(NC)"
-	pnpm install
-	@echo "$(BLUE)Installing frontend dependencies...$(NC)"
-	cd $(FRONTEND_DIR) && pnpm install
-	@echo "$(BLUE)Syncing Anchor keys...$(NC)"
-	pnpm run anchor keys sync
-	@echo "$(BLUE)Building Anchor programs...$(NC)"
-	pnpm run anchor-build
-	@echo "$(BLUE)Generating TypeScript clients...$(NC)"
-	pnpm run codama:js
-	@echo "$(GREEN)✅ Minimal setup complete (API Gateway skipped)$(NC)"
-
 ##@ Development
 dev: ## Start development environment (requires localnet)
 	@echo "$(GREEN)Starting frontend development server...$(NC)"
