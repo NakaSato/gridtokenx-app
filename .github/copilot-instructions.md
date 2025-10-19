@@ -1,132 +1,200 @@
 # GridTokenX App - AI Coding Agent Instructions
 
-## Architecture Overview
+## 🏗️ Architecture Overview
 
-This is a **P2P Energy Trading System** with dual-architecture:
-- **Frontend**: React 18+/Vite app with TypeScript using Gill Solana SDK and Wallet UI
-- **Backend**: Multi-program Anchor workspace with 5 Solana programs for comprehensive energy trading
+**GridTokenX** is a P2P Energy Trading System with a **monorepo pnpm workspace** containing:
+- **Frontend** (`frontend/`): React 18 + Vite + Gill Solana SDK - Next.js alternative in `frontend-exchange/`
+- **Anchor Workspace** (`anchor/`): 5 Solana programs + Codama TypeScript code generation
+- **API Gateway** (`api-gateway/`): Rust async backend with PostgreSQL, TimescaleDB, Redis
+- **Docker Services**: Smart meter simulator (Python), databases, validator, nginx
 
-**Key Integration Pattern**: Anchor programs → Codama code generation → React app consumption via generated TypeScript clients.
+**Critical Integration**: Anchor programs → (Codama codegen) → TypeScript clients → React hooks → UI
 
-## Essential Development Workflow
+## 🎯 Program-First Development Workflow
 
-### 1. Program-First Development
-Always start with Anchor programs when adding new functionality:
-```bash
-npm run setup  # Syncs program IDs, builds, generates TS clients (CRITICAL after program changes)
+**When adding blockchain functionality, ALWAYS start with Anchor programs:**
+
+1. **Define instruction in Rust** (`anchor/programs/[name]/src/lib.rs`)
+2. **Run code generation pipeline** (CRITICAL):
+   ```bash
+   pnpm run setup           # Full pipeline: keys sync → build → codegen
+   # OR individual steps:
+   pnpm run anchor-build    # Builds and generates IDL files
+   pnpm run codama:js       # Generates TS clients from IDL
+   ```
+3. **Use generated helpers in React** (from `@project/anchor` imports)
+
+**Key Files:**
+- `anchor/Anchor.toml` - Program IDs, cluster config, provider settings
+- `anchor/codama.js` - Codama configuration (has Gill issue workaround via `create-codama-config.js`)
+- `anchor/src/gridtokenxapp-exports.ts` - Main exports: re-exports all generated clients + helpers like `getGridtokenxappProgramAccounts()`
+
+## 🧩 Five-Program Architecture
+
+| Program | Address | Purpose |
+|---------|---------|---------|
+| **energy-token** | `FaELH...6r` | ERC/token minting, REC validation |
+| **governance** | `EAcyE...gb` | Proof-of-Authority voting |
+| **oracle** | `G365L...gG` | AMI meter data processing |
+| **registry** | `FSXdx...eJ` | Participant KYC, smart meter registration |
+| **trading** | `CEWpf...oD` | P2P order matching & execution |
+
+## 🎨 Frontend Architecture (Feature-Based)
+
+### Directory Structure
+```
+frontend/src/
+├── features/[feature]/           # Self-contained feature modules
+│   ├── data-access/              # React Query hooks + generated client consumption
+│   │   ├── use-[feature]-[action]-query.ts      # Queries
+│   │   ├── use-[feature]-[action]-mutation.ts   # Mutations
+│   │   └── use-[feature]-accounts-query-key.ts  # Query key generation
+│   ├── ui/                       # Pure React components
+│   │   └── [feature]-ui-[component].tsx
+│   └── [feature]-feature.tsx      # Feature entry point (lazy-loaded)
+├── components/
+│   ├── app-providers.tsx          # Provider hierarchy (ReactQuery → Theme → Solana)
+│   ├── app-routes.tsx             # Route definitions
+│   └── solana/use-solana.ts       # Context for cluster + signer access
+└── app.tsx                        # Main App entry
 ```
 
-### 2. Code Generation Pipeline
-- Anchor builds generate IDL files in `anchor/target/idl/`
-- Codama (via `anchor/codama.js`) generates TypeScript clients in `anchor/src/client/js/`
-- Frontend imports via `@project/anchor` alias from `anchor/src/gridtokenxapp-exports.ts`
-- **Note**: Local `create-codama-config.js` workaround for Gill issue #207
+### Feature-Based Naming Conventions
+- **Hooks**: `use-[feature]-[action]-[type]` e.g., `use-registry-participants-query.ts`
+- **Components**: `[feature]-ui-[component]` e.g., `registry-ui-list.tsx`
+- **Queries**: `use-[feature]-accounts-query-key` returns `['[feature]', 'accounts', { cluster }]`
 
-### 3. Required Commands After Program Changes
-```bash
-npm run anchor-build    # Build Anchor programs
-npm run codama:js      # Generate TS clients
-npm run setup          # Complete pipeline (preferred)
-```
+### Transaction & Query Patterns
 
-## Multi-Program Architecture (P2P Energy Trading)
-
-### 5 Core Programs:
-1. **energy-token** (`FaELH72fUMRaLTX3ersmQLr4purfHGvJccm1BXfDPL6r`) - Token management, REC validation
-2. **governance** (`EAcyEzfXXJCDnjZKUrgHsBEEHmnozZJXKs2wdW3xnWgb`) - Proof-of-Authority governance
-3. **oracle** (`G365L8A4Y3xmp5aN2GGLj2SJr5KetgE5F57PaFvCgSgG`) - AMI data processing, REC authority validation
-4. **registry** (`FSXdxk5uPUvJc51MzjtBaCDrFh7RSMcHFHKpzCG9LeuJ`) - Participant registration, smart meter management
-5. **trading** (`CEWpf4Rvm3SU2zQgwsQpi5EMYBUrWbKLcAhAT2ouVoWD`) - P2P energy trading, order matching
-
-### Smart Meter Integration
-- Simulator located in `docker/smart-meter-simulator/`
-- Python-based with weather simulation and prosumer/consumer capabilities
-- Grid operator manages meters for consumer/prosumer roles
-
-## Project Structure Conventions
-
-### Feature-Based Architecture
-Each feature follows strict separation: `/src/features/[feature]/`
-- `data-access/` - React Query hooks, mutations, program interactions
-- `ui/` - Pure UI components specific to the feature
-- `[feature]-feature.tsx` - Main feature entry point
-
-### Naming Patterns
-- **Hooks**: `use-[feature]-[action]-[type].ts` (e.g., `use-gridtokenxapp-initialize-mutation.ts`)
-- **UI Components**: `[feature]-ui-[component].tsx` (e.g., `gridtokenxapp-ui-button-initialize.tsx`)
-- **Program Methods**: Match Anchor instruction names exactly
-
-## Solana/Web3 Integration Patterns
-
-### Wallet & Provider Setup
-- Uses `@wallet-ui/react` with Gill SDK integration
-- Providers hierarchy: `ReactQuery` → `ThemeProvider` → `SolanaProvider` → `WalletUiGillProvider`
-- Clusters: localnet (development) and devnet configured
-
-### Transaction Pattern
-Every mutation follows this structure:
+**Mutations (state changes):**
 ```typescript
-// 1. Get signer from wallet
-const signer = useWalletUiSigner({ account })
-const signAndSend = useWalletUiSignAndSend()
-
-// 2. Use generated instruction helper
-const instruction = getXxxInstruction({ payer: signer, /* other accounts */ })
-
-// 3. Sign and send with toast feedback
-await signAndSend(instruction, signer)
+export function useRegistryRegisterMutation({ account }: { account: UiWalletAccount }) {
+  const signer = useWalletUiSigner({ account })
+  const signAndSend = useWalletUiSignAndSend()
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (data) => {
+      const instruction = getRegisterInstruction({ payer: signer, ...data })
+      return await signAndSend(instruction, signer)
+    },
+    onSuccess: async (tx) => {
+      toastTx(tx)  // Toast feedback
+      queryClient.invalidateQueries({ queryKey: ['registry', 'accounts'] })
+    }
+  })
+}
 ```
 
-### Account Querying Pattern
-- Use `getGridtokenxappProgramAccounts()` helper from generated exports
-- All queries invalidate on cluster change via query keys: `['[program]', 'accounts', { cluster }]`
+**Queries (data fetching):**
+```typescript
+export function useRegistryAccountsQuery() {
+  const { client } = useSolana()
+  const queryKey = useRegistryAccountsQueryKey()  // ['registry', 'accounts', { cluster }]
+  
+  return useQuery({
+    queryKey,
+    queryFn: () => getRegistryProgramAccounts(client.rpc),
+    staleTime: 30_000,
+  })
+}
+```
 
-## Development Environment Setup
+## 🔌 Solana/Web3 Integration
 
-### Local Development (Verified Working)
+### Provider Hierarchy
+```tsx
+<ReactQueryProvider>           // Queries + mutations
+  <ThemeProvider>              // Dark/light mode
+    <SolanaProvider>           // Cluster context
+      <WalletUiGillProvider>   // Wallet UI + Signer
+        <App />
+```
+
+- **Get signer**: `const signer = useWalletUiSigner({ account })`
+- **Get RPC client**: `const { client } = useSolana()` → `client.rpc`
+- **Sign & send**: `const signAndSend = useWalletUiSignAndSend()`
+
+### Authority Patterns
+- **REC operations** (Renewable Energy Certificates) are **authority-only**
+- Engineering Department holds REC issuing authority
+- Always validate authority before minting/validating RECs
+
+## 🐳 Docker & Multi-Service Setup
+
+**docker-compose.yml** provides complete local stack:
+- `solana-validator` - Local test validator (port 8899)
+- `postgres` - Relational DB (port 5432)
+- `redis` - Cache layer (port 6379)
+- `contact` - Smart contract deployer (runs once)
+- `smart-meter-simulator` - Python AMI simulator with weather/trading
+
+**Minimal local dev** (no Docker):
 ```bash
-npm run anchor-localnet  # Starts test validator at http://127.0.0.1:8899
-npm run dev             # Starts Vite dev server
+pnpm run anchor-localnet     # Starts validator + deploys programs
+cd frontend && pnpm run dev  # In another terminal
 ```
 
-### Testing & Validation
+## 🚀 Development Commands
+
+### Setup & Build
 ```bash
-npm run anchor-test     # Runs Anchor program tests
-npm run anchor-build    # Verify build success
+make setup               # Complete setup (install + build + codegen)
+make setup-minimal       # Frontend + blockchain only
+make build              # Build all: anchor, frontend, api-gateway
+make install-all        # Install all deps
 ```
 
-### REC Authority Validation
-- REC (Renewable Energy Certificate) operations are authority-only
-- Engineering Department has REC issuing authority
-- Authority validation required for REC operations
+### Development
+```bash
+make dev               # Frontend dev (requires localnet running)
+make dev-full          # Localnet + API + Frontend (all processes)
+make localnet          # Just the validator
+make localnet-clean    # Clean validator restart
+```
 
-## Key Files That Define Architecture
+### Testing
+```bash
+make test              # All tests
+make test-anchor       # Anchor program tests (vitest)
+pnpm run anchor-test   # Direct anchor test
+```
 
-- `anchor/Anchor.toml` - Program IDs and cluster configuration
-- `anchor/codama.js` - Code generation configuration
-- `anchor/src/gridtokenxapp-exports.ts` - Main program exports and helpers
-- `src/components/app-providers.tsx` - Provider hierarchy setup
-- `.env.example` - Complete environment configuration template
-- `docker/smart-meter-simulator/` - Smart meter simulation system
+### API Gateway
+```bash
+make dev-api           # Rust API server
+make build-api         # Production build
+# Note: SQLX_OFFLINE=true skips compile-time DB checks
+```
 
-## Critical Development Patterns
+## 📚 Key Files to Understand Architecture
 
-1. **Always run `npm run setup`** after program changes (syncs IDs, builds, generates clients)
-2. **Use generated instruction helpers** instead of raw instruction building
-3. **Follow feature/data-access/ui separation** for new features
-4. **Query invalidation on cluster/transaction changes** for real-time UI updates
-5. **Toast feedback** (`toastTx()`) for all transactions
-6. **Ed25519 polyfill** required for browser compatibility with `generateKeyPairSigner`
-7. **Authority-only operations** for REC validation and issuance
+1. **Backend**: `api-gateway/src/lib.rs` - AppState with db/redis/config
+2. **Code Gen**: `anchor/codama.js`, `anchor/src/create-codama-config.js`
+3. **Frontend Config**: `frontend/src/components/app-providers.tsx`
+4. **Routes**: `frontend/src/app-routes.tsx` (all lazy-loaded features)
+5. **Query Keys**: `frontend/src/features/*/data-access/*query-key.ts`
+6. **Example Feature**: `frontend/src/features/registry/` (complete reference implementation)
 
-## Environment Configuration
+## ⚠️ Critical Gotchas & Patterns
 
-The system supports comprehensive configuration via `.env.example`:
-- Program IDs for all 5 programs
-- Database connections (PostgreSQL, TimescaleDB)
-- Message queues (Redis, Kafka)
-- Smart meter simulation parameters
-- API gateway settings (Node.js and Rust)
-- REC authority validation settings
+1. **ALWAYS run `pnpm run setup`** after modifying Anchor programs - code generation is not automatic
+2. **Query invalidation by cluster** - Query keys must include `{ cluster }` to re-fetch on network switch
+3. **Toast notifications** - Use `toastTx(tx)` after successful mutations for user feedback
+4. **Lazy-loaded routes** - All features imported as `lazy(() => import(...))` in `app-routes.tsx`
+5. **Generated clients** - Never write raw instruction builders; use `get[Action]Instruction()` from generated exports
+6. **Ed25519 polyfill** - Required for browser `generateKeyPairSigner()` compatibility
+7. **Workspace vs Packages** - pnpm workspace: root scripts run all packages, use `cd [dir] && cmd` for specific ones
+8. **API Gateway offline mode** - Uses `SQLX_OFFLINE=true` for build without database; `.sqlx` cache tracks schema
 
-When adding new programs or features, maintain the established patterns of code generation, feature separation, and React Query integration.
+## 🌐 Environment Configuration
+
+Key `.env` variables (see `.env.example`):
+- Program IDs (5 programs)
+- Database URLs: PostgreSQL, TimescaleDB
+- RPC endpoints (localnet, devnet)
+- Redis connection
+- Smart meter simulator config
+- API gateway ports
+
+Default local RPC: `http://127.0.0.1:8899`

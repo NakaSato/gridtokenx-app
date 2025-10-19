@@ -2,7 +2,7 @@
 @startuml C4_Level_3_Components_Frontend
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title GridTokenX - Web Application Components (Level 3)
+title P2P - Web Application Components (Level 3)
 
 Container_Boundary(webApp, "React 18 Web Application") {
     ' Core Framework Components

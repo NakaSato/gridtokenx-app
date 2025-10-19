@@ -2,7 +2,7 @@
 @startuml C4_Level_3_Components_Anchor
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title GridTokenX - Anchor Programs Components (Level 3)
+title P2P - Anchor Programs Components (Level 3)
 
 Container_Boundary(anchorPrograms, "Anchor Blockchain Programs (Solana)") {
     

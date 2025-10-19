@@ -2,34 +2,34 @@
 @startuml C4_Level_1_System_Context
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
 
-title GridTokenX - System Context Diagram (Level 1)
-SHOW_PERSON_OUTLINE()
+title P2P - System Context Diagram (Level 1)
+
+' Font styling
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam fontSize 14
+skinparam titleFontSize 18
+skinparam titleFontStyle bold
 
 ' Actors
-Person(consumer, "Consumer", "Buys renewable energy from prosumers")
-Person(prosumer, "Prosumer", "Produces and sells renewable energy")
-Person(gridOp, "Grid Operator", "Manages meters, validates prosumers, enforces policies")
+Person(prosumer, "Prosumer", "Produces and sells renewable energy, also buys from others")
 Person(recAuth, "REC Authority", "Issues and validates Renewable Energy Certificates")
 
 ' Main System
-System(gridtokenx, "GridTokenX P2P Energy Trading", "Blockchain-based peer-to-peer energy trading platform with PoA governance")
+System(gridtokenx, "P2P Energy Trading", "Blockchain-based peer-to-peer energy trading platform with PoA governance")
 
 ' External Systems
 System_Ext(solana, "Solana Blockchain", "Executes smart contracts, stores trade records & tokens")
 System_Ext(ami, "AMI Backend", "Smart meter data provider, prosumer validation")
-System_Ext(weather, "Weather Service", "Provides solar/wind production forecasts")
 System_Ext(oracle, "Market Oracle", "Pricing feeds, grid conditions, demand signals")
 
 ' Actor Relationships
-Rel(consumer, gridtokenx, "Browse available energy, place buy orders")
-Rel(prosumer, gridtokenx, "List energy for sale, execute trades, receive payments")
-Rel(gridOp, gridtokenx, "Register meters, validate prosumers, manage policies")
+Rel(prosumer, gridtokenx, "Browse available energy, place buy/sell orders, execute trades, receive payments")
 Rel(recAuth, gridtokenx, "Validate REC issuance, authorize energy certificates")
 
 ' System External Relationships
 Rel(gridtokenx, solana, "Submit transactions, verify tokens, record trades")
 Rel(gridtokenx, ami, "Query meter readings, validate prosumer credentials")
-Rel(gridtokenx, weather, "Fetch production forecasts for recommendations")
 Rel(gridtokenx, oracle, "Get pricing & market data for order matching")
 
 @enduml

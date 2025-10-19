@@ -1,9 +1,14 @@
-```plantuml
 @startuml C4_Level_2_Containers
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-title GridTokenX - Container Diagram (Level 2)
-SHOW_PERSON_OUTLINE()
+title P2P - Container Diagram (Level 2)
+' Font styling
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam fontSize 14
+skinparam titleFontSize 18
+skinparam titleFontStyle bold
+
 
 ' Actors
 Person(consumer, "Consumer", "Energy buyer")
@@ -12,7 +17,7 @@ Person(gridOp, "Grid Operator", "Operations & governance")
 Person(recAuth, "REC Authority", "Certificate validation")
 
 ' Main System Boundary
-System_Boundary(gridtokenx, "GridTokenX Platform") {
+System_Boundary(gridtokenx, "P2P Platform") {
     ' Frontend Layer
     Container(frontend, "Web Application", "React 18 + Vite + TypeScript", "SPA for energy trading, order management, account dashboard")
     
@@ -78,18 +83,7 @@ Rel(weatherSvc, oracleProgram, "Weather forecasts")
 Rel(pricingOracle, oracleProgram, "Price feeds")
 
 ' Blockchain to Solana
-Rel(energyToken, solana, "Token transactions")
-Rel(registry, solana, "Registration transactions")
-Rel(trading, solana, "Trading transactions")
-Rel(governance, solana, "Governance transactions")
 Rel(oracleProgram, solana, "Oracle transactions")
 
-@enduml
-```
-
-Rel(energyToken, solanaNetwork, "On-chain")
-Rel(registryProgram, solanaNetwork, "On-chain")
-Rel(tradingProgram, solanaNetwork, "On-chain")
-Rel(governanceProgram, solanaNetwork, "On-chain")
 
 @enduml

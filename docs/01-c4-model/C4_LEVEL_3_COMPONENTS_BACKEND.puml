@@ -2,7 +2,7 @@
 @startuml C4_Level_3_Components_Backend
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title GridTokenX - API Gateway Backend Components (Level 3)
+title P2P - API Gateway Backend Components (Level 3)
 
 Container_Boundary(apiGateway, "API Gateway (Rust + Actix-Web)") {
     

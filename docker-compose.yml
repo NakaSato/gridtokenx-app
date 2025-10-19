@@ -1,5 +1,5 @@
 services:
-  # Smart Contract Deployment Service - OPTIMIZED
+  # Smart Contract Deployment Service
   contact:
     build:
       context: ./docker/contact
