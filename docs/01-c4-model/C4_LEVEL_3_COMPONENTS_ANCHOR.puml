@@ -1,0 +1,89 @@
+```plantuml
+@startuml C4_Level_3_Components_Anchor
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title GridTokenX - Anchor Programs Components (Level 3)
+
+Container_Boundary(anchorPrograms, "Anchor Blockchain Programs (Solana)") {
+    
+    ' Energy Token Program
+    Container_Boundary(energyTokenProgram, "Energy Token Program\n[FaELH72fUMRaLTX3ersmQLr4purfHGvJccm1BXfDPL6r]") {
+        Component(tokenMint, "REC Token Mint", "SPL Token", "Renewable Energy Certificate mint")
+        Component(recIssuance, "REC Issuance", "Instruction Handler", "Authority-only REC creation")
+        Component(recBurn, "REC Burn", "Instruction Handler", "Redeems used energy")
+        Component(tokenMetadata, "Token Metadata", "Metaplex Standard", "Token symbol, supply, decimals")
+        Component(tokenAccounts, "Associated Accounts", "Token Accounts", "User REC balances")
+    }
+    
+    ' Registry Program
+    Container_Boundary(registryProgram, "Registry Program\n[FSXdxk5uPUvJc51MzjtBaCDrFh7RSMcHFHKpzCG9LeuJ]") {
+        Component(prosumerReg, "Prosumer Registration", "Instruction Handler", "Register energy producers")
+        Component(consumerReg, "Consumer Registration", "Instruction Handler", "Register energy consumers")
+        Component(meterRegistry, "Meter Management", "Instruction Handler", "Assign smart meters")
+        Component(kycValidation, "KYC Validation", "Business Logic", "Verify prosumers via AMI")
+        Component(registryState, "Registry State", "PDA Accounts", "User & meter records")
+    }
+    
+    ' Trading Program
+    Container_Boundary(tradingProgram, "Trading Program\n[CEWpf4Rvm3SU2zQgwsQpi5EMYBUrWbKLcAhAT2ouVoWD]") {
+        Component(orderCreation, "Order Creation", "Instruction Handler", "Create buy/sell orders")
+        Component(orderBook, "Order Book", "PDA Storage", "Active trading orders")
+        Component(orderMatching, "Order Matching", "Business Logic", "Matches buyer & seller")
+        Component(orderExecution, "Trade Execution", "Instruction Handler", "Settles & records trades")
+        Component(tradeEscrow, "Escrow Accounts", "Token Accounts", "Holds tokens during trades")
+        Component(tradeHistory, "Trade History", "PDA Accounts", "Immutable trade records")
+    }
+    
+    ' Governance Program
+    Container_Boundary(governanceProgram, "Governance Program\n[EAcyEzfXXJCDnjZKUrgHsBEEHmnozZJXKs2wdW3xnWgb]") {
+        Component(proposalCreate, "Proposal Creation", "Instruction Handler", "Submit governance proposals")
+        Component(proposalStorage, "Proposal Storage", "PDA Accounts", "Active proposals")
+        Component(voting, "Voting", "Instruction Handler", "Authority members vote")
+        Component(policyExecution, "Policy Execution", "Business Logic", "Enforces voted policies")
+        Component(authorityManagement, "Authority Management", "Instruction Handler", "Grid Operator role")
+    }
+    
+    ' Oracle Program
+    Container_Boundary(oracleProgram, "Oracle Program\n[G365L8A4Y3xmp5aN2GGLj2SJr5KetgE5F57PaFvCgSgG]") {
+        Component(priceOracle, "Price Feed", "Data Account", "Real-time energy pricing")
+        Component(meterValidator, "Meter Validator", "Instruction Handler", "Validates AMI readings")
+        Component(authorityValidator, "Authority Validator", "Instruction Handler", "Validates signer authority")
+        Component(oracleData, "Oracle Data Store", "PDA Accounts", "Pricing & validation data")
+    }
+}
+
+' External Storage
+Container_Boundary(storage, "Solana Ledger Storage") {
+    Component(pdaStorage, "Program Accounts", "PDA", "All program state (immutable)")
+    Component(userAccounts, "User Accounts", "Keypairs", "User wallet addresses")
+    Component(systemProgram, "System Program", "Native", "Account creation")
+}
+
+' Cross-Program References
+Rel(energyTokenProgram, registryProgram, "Validates prosumer")
+Rel(energyTokenProgram, oracleProgram, "Checks REC authority")
+
+Rel(registryProgram, energyTokenProgram, "Initializes user tokens")
+Rel(registryProgram, kycValidation, "Validates via")
+
+Rel(tradingProgram, energyTokenProgram, "Transfers tokens")
+Rel(tradingProgram, registryProgram, "Validates participants")
+Rel(tradingProgram, orderMatching, "Uses logic")
+
+Rel(governanceProgram, registryProgram, "Manages authorities")
+Rel(governanceProgram, tradingProgram, "Enforces policies")
+
+Rel(oracleProgram, energyTokenProgram, "Provides pricing")
+
+' Storage Relationships
+Rel(energyTokenProgram, pdaStorage, "Stores")
+Rel(registryProgram, pdaStorage, "Stores")
+Rel(tradingProgram, pdaStorage, "Stores")
+Rel(governanceProgram, pdaStorage, "Stores")
+Rel(oracleProgram, pdaStorage, "Stores")
+
+Rel(tokenAccounts, userAccounts, "Owned by")
+Rel(registryState, userAccounts, "References")
+
+@enduml
+```

@@ -1,0 +1,85 @@
+```plantuml
+@startuml C4_Level_3_Components_Frontend
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title GridTokenX - Web Application Components (Level 3)
+
+Container_Boundary(webApp, "React 18 Web Application") {
+    ' Core Framework Components
+    Component(viteApp, "Vite App", "Build Tool", "Fast development server, optimized builds")
+    Component(router, "Router", "React Router v6", "Client-side navigation, URL sync")
+    
+    ' Authentication & Wallet Layer
+    Component(walletUI, "Wallet UI Integration", "Gill Wallet UI", "Solana wallet connection, account management")
+    Component(authHook, "Auth Hooks", "Custom Hooks", "useWalletUiSigner(), useWalletUiSignAndSend()")
+    
+    ' Feature-Based Architecture
+    Component(registryFeature, "Registry Feature", "/src/features/registry/", "Prosumer registration & KYC")
+    Component(tradingFeature, "Trading Feature", "/src/features/trading/", "Order creation & management")
+    Component(govFeature, "Governance Feature", "/src/features/governance/", "Voting & policy management")
+    Component(meterFeature, "Meter Feature", "/src/features/meter/", "Meter data visualization")
+    Component(accountFeature, "Account Feature", "/src/features/account/", "User profile & settings")
+    
+    ' Feature Structure (per feature)
+    Component(dataAccess, "Data Access Hooks", "react-query + mutations", "")
+    Note right of dataAccess
+        - use-[feature]-query.ts
+        - use-[feature]-mutation.ts
+        - use-[feature]-[action].ts
+    end note
+    
+    Component(uiComponents, "UI Components", "Feature Components", "")
+    Note right of uiComponents
+        - [feature]-ui-*.tsx
+        - [feature]-container.tsx
+        - [feature]-form.tsx
+    end note
+    
+    Component(generatedClients, "Generated Clients", "Codama Output", "Typed clients for each program")
+    Note right of generatedClients
+        - energyTokenClient
+        - registryClient
+        - tradingClient
+        - governanceClient
+        - oracleClient
+    end note
+    
+    ' Global State Management
+    Component(queryClient, "React Query", "Data Management", "Server state management, caching")
+    Component(contextState, "Context API", "Global State", "Theme, user preferences")
+    Component(providers, "Providers", "App Providers", "QueryProvider, ThemeProvider, SolanaProvider")
+}
+
+' External Integrations
+Container_Boundary(external, "External Services") {
+    Component(solanaWallet, "Solana Wallet", "Phantom/Solflare", "User's wallet for signing")
+    Component(rpcNode, "Solana RPC", "HTTP Endpoint", "Blockchain data access")
+}
+
+' Relationships
+Rel(viteApp, router, "Uses")
+Rel(viteApp, providers, "Wraps app")
+
+Rel(router, registryFeature, "Routes to")
+Rel(router, tradingFeature, "Routes to")
+Rel(router, govFeature, "Routes to")
+Rel(router, meterFeature, "Routes to")
+Rel(router, accountFeature, "Routes to")
+
+Rel(walletUI, authHook, "Provides signer")
+Rel(authHook, uiComponents, "Used by")
+
+Rel(uiComponents, dataAccess, "Calls hooks")
+Rel(dataAccess, queryClient, "Uses")
+Rel(dataAccess, generatedClients, "Consumes")
+
+Rel(generatedClients, rpcNode, "Queries blockchain")
+Rel(authHook, solanaWallet, "Signs transactions")
+Rel(walletUI, solanaWallet, "Integrates")
+
+Rel(providers, queryClient, "Provides")
+Rel(providers, contextState, "Provides")
+Rel(providers, walletUI, "Provides")
+
+@enduml
+```

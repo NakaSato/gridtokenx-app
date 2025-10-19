@@ -40,5 +40,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 # Expose metrics port
 EXPOSE 9090
 
-# Default command - run enhanced simulator
-CMD ["python", "enhanced_simulator.py"]
+# Default command - run simulator
+CMD ["python", "simulator.py"]

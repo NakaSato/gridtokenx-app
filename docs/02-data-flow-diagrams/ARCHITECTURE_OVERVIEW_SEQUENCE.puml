@@ -1,0 +1,180 @@
+@startuml GridTokenX_Architecture_Overview
+!define FONT_NAME Arial
+!define FONT_SIZE 10
+!theme plain
+
+skinparam {
+    DefaultFontName FONT_NAME
+    DefaultFontSize FONT_SIZE
+    Padding 8
+    Margin 8
+    BackgroundColor white
+    BorderColor #333333
+    ArrowColor #333333
+}
+
+' Title
+title GridTokenX - Comprehensive System Architecture & Data Flow
+
+' Users and External Systems
+actor "Campus Users\n(Prosumer/Consumer)" as USERS
+actor "Grid Operator" as GRID_OP
+actor "Engineering Authority" as ENGINEER
+participant "Weather/Price APIs" as EXT_API
+
+' Frontend Application
+box "Frontend Layer (Vite + React 18)" #E3F2FD
+    participant "React Components" as REACT_UI
+    participant "React Query" as RQ_HOOKS
+    participant "Wallet UI\n(Solana)" as WALLET_UI
+    participant "Gill SDK" as GILL_SDK
+end box
+
+' API Gateway
+box "API Gateway (Rust/Axum)" #BBDEFB
+    participant "REST Endpoints" as REST_API
+    participant "JWT Auth" as JWT_AUTH
+    participant "Business Logic" as BUSILOGIC
+    participant "RPC Client" as RPC_CLIENT
+end box
+
+' Blockchain Layer
+box "Solana Blockchain (PoA)" #B3E5FC
+    participant "Registry Program" as PROG_REG
+    participant "Energy Token\nProgram" as PROG_TOKEN
+    participant "Trading Program" as PROG_TRADE
+    participant "Oracle Program" as PROG_ORACLE
+    participant "Governance\nProgram" as PROG_GOV
+    participant "Validator\n(Authority)" as VALIDATOR
+end box
+
+' Storage Layer
+box "Data Storage" #C8E6C9
+    participant "PostgreSQL" as PSQL
+    participant "TimescaleDB" as TSDB
+    participant "Redis Cache" as REDIS
+end box
+
+' Monitoring Layer
+box "Monitoring & Analytics" #FFF9C4
+    participant "Prometheus" as PROM
+    participant "Grafana" as GRAFANA
+    participant "Logging" as LOGS
+end box
+
+' Smart Meter Simulator
+box "Smart Meter System" #FFCCBC
+    participant "AMI Simulator\n(Python)" as AMI_SIM
+    participant "Weather Data" as WEATHER
+end box
+
+' === DATA FLOW: USER REGISTRATION ===
+USERS --> WALLET_UI : Connect Wallet
+WALLET_UI --> GILL_SDK : Load Signer
+GILL_SDK --> REACT_UI : Ready to Sign
+REACT_UI --> RQ_HOOKS : Register Mutation
+RQ_HOOKS --> REST_API : POST /register
+REST_API --> JWT_AUTH : Verify Signature
+JWT_AUTH --> PROG_REG : Register User Instruction
+PROG_REG --> VALIDATOR : Validate & Sign
+VALIDATOR --> PROG_REG : Block Produced
+PROG_REG --> PSQL : Store User Account
+PSQL --> RQ_HOOKS : Account Created
+RQ_HOOKS --> REACT_UI : Show Success
+
+' === DATA FLOW: METER CONFIGURATION ===
+GRID_OP --> REACT_UI : Assign Meter
+REACT_UI --> RQ_HOOKS : Config Mutation
+RQ_HOOKS --> REST_API : POST /meters
+REST_API --> BUSILOGIC : Validate Meter
+BUSILOGIC --> PROG_ORACLE : Register Meter
+PROG_ORACLE --> PSQL : Store Config
+PSQL --> REDIS : Cache Settings
+PROG_ORACLE --> PROG_REG : Authority Check
+
+' === DATA FLOW: AMI DATA COLLECTION ===
+AMI_SIM --> WEATHER : Get Weather Data
+WEATHER --> AMI_SIM : Weather Info
+AMI_SIM --> REST_API : Send Readings
+REST_API --> BUSILOGIC : Process AMI Data
+BUSILOGIC --> PROG_ORACLE : Validate Data
+PROG_ORACLE --> TSDB : Store Time-Series
+TSDB --> REDIS : Cache Latest
+PROG_ORACLE --> PROG_TOKEN : Calculate Energy
+PROG_TOKEN --> VALIDATOR : Mint Tokens
+
+' === DATA FLOW: TRADING WORKFLOW ===
+USERS --> REACT_UI : Create Order
+REACT_UI --> RQ_HOOKS : Trade Mutation
+RQ_HOOKS --> REST_API : POST /orders
+REST_API --> BUSILOGIC : Order Validation
+BUSILOGIC --> REDIS : Check Balance
+BUSILOGIC --> PROG_TRADE : Create Order
+PROG_TRADE --> PROG_TOKEN : Validate Tokens
+PROG_TOKEN --> VALIDATOR : Execute
+VALIDATOR --> PROG_TRADE : Order Stored
+PROG_TRADE --> TSDB : Log Trade
+REST_API --> REACT_UI : Order Confirmed
+
+' === DATA FLOW: ORDER MATCHING ===
+BUSILOGIC --> PROG_TRADE : Query Book
+PROG_TRADE --> BUSILOGIC : Find Match
+BUSILOGIC --> PROG_TRADE : Execute Trade
+PROG_TRADE --> PROG_TOKEN : Transfer
+PROG_TOKEN --> VALIDATOR : Finality
+PROG_TOKEN --> REDIS : Update Cache
+BUSILOGIC --> TSDB : Record Trade
+
+' === DATA FLOW: GOVERNANCE ===
+ENGINEER --> PROG_GOV : Admin Command
+PROG_GOV --> VALIDATOR : Authority Check
+VALIDATOR --> PROG_GOV : Execute
+PROG_GOV --> PROG_REG : Update Rules
+PROG_GOV --> PROG_TRADE : Update Params
+
+' === DATA FLOW: MONITORING ===
+REST_API --> PROM : Export Metrics
+TSDB --> PROM : Query Data
+PROM --> GRAFANA : Display
+LOGS --> GRAFANA : Show Logs
+BUSILOGIC --> LOGS : Write Events
+
+' === DATA FLOW: USER DASHBOARD ===
+USERS --> REACT_UI : View Portfolio
+REACT_UI --> RQ_HOOKS : Dashboard Query
+RQ_HOOKS --> REST_API : GET /portfolio
+REST_API --> PSQL : Fetch User
+REST_API --> REDIS : Get Holdings
+REDIS --> REST_API : Cache Hit
+REST_API --> RQ_HOOKS : Return Data
+RQ_HOOKS --> REACT_UI : Render Charts
+
+' === EXTERNAL INTEGRATIONS ===
+EXT_API --> BUSILOGIC : Market Data
+BUSILOGIC --> PROG_TRADE : Price Update
+
+note right of PROG_GOV
+    Authority Validator:
+    • Single PoA validator
+    • Immediate finality
+    • Engineering Dept control
+    • 400ms block time
+end note
+
+note bottom of TSDB
+    Energy Readings
+    • Real-time metrics
+    • Time-series optimized
+    • 1-minute intervals
+    • Historical data
+end note
+
+note bottom of REDIS
+    Real-time Cache
+    • Order book
+    • User balances
+    • Meter readings
+    • Session data
+end note
+
+@enduml

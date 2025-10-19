@@ -1,0 +1,112 @@
+@startuml GridTokenX_DFD_Level_1
+!define FONT_NAME Arial
+!define FONT_SIZE 9
+!theme plain
+
+skinparam {
+    DefaultFontName FONT_NAME
+    DefaultFontSize FONT_SIZE
+    Padding 6
+    Margin 6
+    BackgroundColor white
+    BorderColor #333333
+    ArrowColor #333333
+}
+
+' External Entities
+oval "Users" as E1 {
+    backgroundColor #FFE0B2
+    borderColor #E65100
+}
+oval "Grid Op" as E2 {
+    backgroundColor #FFE0B2
+    borderColor #E65100
+}
+oval "Authority" as E3 {
+    backgroundColor #FFE0B2
+    borderColor #E65100
+}
+oval "External APIs" as E4 {
+    backgroundColor #FFE0B2
+    borderColor #E65100
+}
+
+' Main Processes - Level 1
+rectangle "1.0\nUser Authentication\n& Registration" as P1 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "2.0\nEnergy Trading\nEngine" as P2 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "3.0\nData Management\n& Analytics" as P3 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "4.0\nSmart Meter\nIntegration" as P4 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "5.0\nBlockchain\nInteraction" as P5 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "6.0\nMonitoring &\nGovernance" as P6 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+' Data Stores
+database "User\nAccounts" as D1
+database "Energy\nTransactions" as D2
+database "Meter\nConfigurations" as D3
+database "System\nLogs" as D4
+
+' Data Flows - User Authentication (1.0)
+E1 --> P1 : Credentials\nWallet Address
+P1 --> D1 : Store/Verify\nUser Account
+D1 --> P1 : User Data\nAuthorization
+P1 --> E1 : Auth Token\nSession
+
+' Data Flows - Energy Trading (2.0)
+E1 --> P2 : Create Order\nPrice, Amount
+P2 --> D2 : Record\nTransaction
+P2 --> P5 : Execute\nSmart Contract
+P5 --> P2 : Transaction\nResult
+P2 --> E1 : Order Status\nFilled/Pending
+
+' Data Flows - Data Management (3.0)
+P2 --> D2 : Write\nTrade Data
+D2 --> P3 : Read\nEnergy Data
+P3 --> D4 : Store\nAnalytics
+P3 --> E1 : Dashboard\nReports
+
+' Data Flows - Smart Meter (4.0)
+E2 --> P4 : Meter\nConfiguration
+P4 --> D3 : Store\nMeter Setup
+D3 --> P4 : Retrieve\nMeter Info
+P4 --> P3 : Energy\nReadings
+E4 --> P4 : Weather\nData
+P4 --> P2 : Available\nEnergy
+
+' Data Flows - Blockchain (5.0)
+P2 --> P5 : Trade\nInstruction
+P5 --> E3 : Request\nValidation
+E3 --> P5 : Block\nCreation
+P5 --> D2 : Write\nTransaction
+
+' Data Flows - Monitoring (6.0)
+E3 --> P6 : System\nCommands
+P1 --> P6 : Auth\nEvents
+P2 --> P6 : Trade\nEvents
+P4 --> P6 : Meter\nEvents
+P6 --> E3 : Status\nAlerts
+P6 --> D4 : Log\nEvents
+
+@enduml

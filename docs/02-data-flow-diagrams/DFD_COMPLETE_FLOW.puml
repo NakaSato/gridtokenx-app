@@ -1,0 +1,130 @@
+@startuml GridTokenX_DFD_Complete_Flow
+!define FONT_NAME Arial
+!define FONT_SIZE 8
+!theme plain
+
+skinparam {
+    DefaultFontName FONT_NAME
+    DefaultFontSize FONT_SIZE
+    Padding 4
+    Margin 4
+    BackgroundColor white
+    BorderColor #333333
+    ArrowColor #333333
+}
+
+' Title
+title GridTokenX Complete End-to-End Data Flow
+
+' External Entities Layer
+oval "User\n(Prosumer)" as USER
+oval "Grid\nOperator" as GRID_OP
+oval "Authority" as AUTH
+oval "External\nAPIs" as EXT
+oval "Monitoring" as MON
+
+' Frontend Layer
+rectangle "Frontend Layer" {
+    rectangle "User Interface\nComponents" as UI
+    rectangle "React Query\nHooks" as RQ
+    rectangle "Wallet\nIntegration" as WALLET
+}
+
+' API Gateway Layer
+rectangle "API Gateway Layer" {
+    rectangle "REST Endpoints" as REST
+    rectangle "Authentication" as AUTH_SVC
+    rectangle "Business Logic" as BIZ
+}
+
+' Blockchain Layer
+rectangle "Blockchain Layer" {
+    rectangle "Registry\nProgram" as REG
+    rectangle "Energy Token\nProgram" as TOK
+    rectangle "Trading\nProgram" as TRD
+    rectangle "Oracle\nProgram" as ORC
+    rectangle "Governance\nProgram" as GOV
+}
+
+' Database Layer
+rectangle "Database Layer" {
+    database "User Data\nPostgreSQL" as USR_DB
+    database "Energy Data\nTimescaleDB" as ENG_DB
+    database "Cache\nRedis" as CACHE
+}
+
+' Data Flow Sequence - User Registration
+USER --> UI : 1. Opens App
+UI --> WALLET : 2. Connect Wallet
+WALLET --> AUTH_SVC : 3. Verify Signature
+AUTH_SVC --> USR_DB : 4. Check Registration
+USR_DB --> AUTH_SVC : 5. User Not Found
+AUTH_SVC --> RQ : 6. Registration Required
+RQ --> REST : 7. POST /register
+REST --> REG : 8. Call Register Instruction
+REG --> GOV : 9. Authority Check
+GOV --> REG : 10. Approved
+REG --> USR_DB : 11. Store User Account
+USR_DB --> RQ : 12. Account Created
+RQ --> UI : 13. Show Dashboard
+
+' Data Flow Sequence - Energy Meter Setup
+GRID_OP --> UI : 14. Assign Meter
+UI --> RQ : 15. Configure Meter
+RQ --> REST : 16. POST /meters
+REST --> BIZ : 17. Validate Config
+BIZ --> USR_DB : 18. Store Assignment
+USR_DB --> CACHE : 19. Cache Config
+REST --> ORC : 20. Register Meter
+ORC --> BIZ : 21. Meter Ready
+
+' Data Flow Sequence - AMI Data Collection
+GRID_OP --> EXT : 22. AMI Simulator\nReads Meter
+EXT --> BIZ : 23. Send Energy Data
+BIZ --> ENG_DB : 24. Store Reading
+ENG_DB --> CACHE : 25. Cache Latest
+BIZ --> ORC : 26. Process Data
+ORC --> TOK : 27. Mint REC Tokens
+TOK --> USR_DB : 28. Update Balance
+
+' Data Flow Sequence - Trading
+USER --> UI : 29. Create Order\n(Sell 10 GRID@2.5)
+UI --> RQ : 30. Place Order
+RQ --> REST : 31. POST /orders
+REST --> BIZ : 32. Order Validation
+BIZ --> CACHE : 33. Check Balance
+CACHE --> BIZ : 34. 10 GRID Available
+BIZ --> TRD : 35. Create Order\nInstruction
+TRD --> GOV : 36. Governance Check
+TRD --> BIZ : 37. Order Stored
+BIZ --> ENG_DB : 38. Log Trade
+REST --> UI : 39. Order Confirmed
+
+' Data Flow Sequence - Order Matching
+BIZ --> TRD : 40. Query Buy Orders
+TRD --> BIZ : 41. Found Match\n(10 GRID@2.5)
+BIZ --> TRD : 42. Execute Trade
+TRD --> TOK : 43. Transfer GRID\nTokens
+TOK --> CACHE : 44. Update Balances
+CACHE --> BIZ : 45. Balances Updated
+BIZ --> ENG_DB : 46. Record Trade
+TRD --> BIZ : 47. Trade Complete
+
+' Data Flow Sequence - Monitoring
+BIZ --> MON : 48. Emit Metrics\n(Orders, Volume)
+REST --> AUTH_SVC : 49. Log Request
+AUTH_SVC --> ENG_DB : 50. Store Log
+REG --> MON : 51. User Events
+TRD --> MON : 52. Trade Events
+
+' Data Flow Sequence - User Dashboard
+USER --> UI : 53. View Dashboard
+UI --> RQ : 54. Query Data
+RQ --> REST : 55. GET /portfolio
+REST --> USR_DB : 56. Fetch User
+REST --> ENG_DB : 57. Get Holdings
+ENG_DB --> REST : 58. User Balances
+REST --> RQ : 59. Return Data
+RQ --> UI : 60. Render Charts
+
+@enduml

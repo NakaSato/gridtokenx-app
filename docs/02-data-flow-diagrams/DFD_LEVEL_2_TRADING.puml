@@ -1,0 +1,95 @@
+@startuml GridTokenX_DFD_Level_2_Trading
+!define FONT_NAME Arial
+!define FONT_SIZE 9
+!theme plain
+
+skinparam {
+    DefaultFontName FONT_NAME
+    DefaultFontSize FONT_SIZE
+    Padding 6
+    Margin 6
+    BackgroundColor white
+    BorderColor #333333
+    ArrowColor #333333
+}
+
+' Title
+title DFD Level 2 - Energy Trading Engine Decomposition (Process 2.0)
+
+' External Entities
+oval "Users" as E1
+oval "Blockchain" as E2
+
+' Sub-processes of 2.0 Energy Trading Engine
+rectangle "2.1\nOrder Validation\n& Matching" as P21 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "2.2\nPrice Discovery\n& Calculation" as P22 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "2.3\nTransaction\nExecution" as P23 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "2.4\nOrder Management" as P24 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "2.5\nLiquidity\nManagement" as P25 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+' Data Stores
+database "Order\nBook" as D21
+database "Trading\nPairs" as D22
+database "Executed\nTrades" as D23
+database "User\nBalances" as D24
+
+' Data Flows - Order Creation
+E1 --> P21 : Buy/Sell Order\nQuantity, Price
+P21 --> D21 : Validate &\nStore Order
+D21 --> P21 : Order\nData
+
+' Order Matching
+P21 --> P24 : Match\nRequest
+P24 --> D21 : Query Open\nOrders
+D21 --> P24 : Order List
+P24 --> P21 : Matched\nOrders
+
+' Price Discovery
+P21 --> P22 : Get Current\nPrice
+D22 --> P22 : Market\nData
+P22 --> D22 : Update\nPrice
+P22 --> P21 : Price\nInfo
+
+' Transaction Execution
+P21 --> P23 : Execute\nMatched Trade
+P23 --> D24 : Update\nBalances
+D24 --> P23 : Current\nBalance
+P23 --> D23 : Log\nTrade
+P23 --> E2 : Smart Contract\nCall
+
+' Liquidity Management
+P25 --> D21 : Monitor\nLiquidity
+D21 --> P25 : Order\nSpread
+P25 --> P22 : Adjust\nPrice
+D22 --> P25 : Market\nData
+P25 --> E1 : Market\nStatus
+
+' Output to User
+P21 --> E1 : Order\nConfirmation
+P23 --> E1 : Trade\nStatus
+D23 --> E1 : Trade\nHistory
+
+' Feedback loops
+P23 --> P21 : Settlement\nConfirmed
+P21 --> P25 : Liquidity\nUpdate
+
+@enduml

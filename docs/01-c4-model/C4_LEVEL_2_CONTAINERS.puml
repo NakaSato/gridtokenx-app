@@ -1,0 +1,95 @@
+```plantuml
+@startuml C4_Level_2_Containers
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title GridTokenX - Container Diagram (Level 2)
+SHOW_PERSON_OUTLINE()
+
+' Actors
+Person(consumer, "Consumer", "Energy buyer")
+Person(prosumer, "Prosumer", "Energy seller/producer")
+Person(gridOp, "Grid Operator", "Operations & governance")
+Person(recAuth, "REC Authority", "Certificate validation")
+
+' Main System Boundary
+System_Boundary(gridtokenx, "GridTokenX Platform") {
+    ' Frontend Layer
+    Container(frontend, "Web Application", "React 18 + Vite + TypeScript", "SPA for energy trading, order management, account dashboard")
+    
+    ' API Gateway Layer
+    Container(apiGateway, "API Gateway", "Rust + Actix-Web + PostgreSQL", "REST API for business logic, user management, authentication")
+    
+    ' Simulation & Services
+    Container(meterSim, "Smart Meter Simulator", "Python + Docker", "Simulates meter readings for prosumers in testing")
+    Container(dataService, "Data Service", "Rust", "Processes meter readings, trading history, analytics")
+    
+    ' Blockchain Programs (Solana)
+    System_Boundary(anchorPrograms, "Solana Programs (Anchor/Rust)") {
+        Container(energyToken, "Energy Token Program", "Anchor", "ERC20-like token, REC minting & burning, burn validation")
+        Container(registry, "Registry Program", "Anchor", "Prosumer registration, smart meter management, KYC validation")
+        Container(trading, "Trading Program", "Anchor", "P2P order book, order matching, settlement, dispute resolution")
+        Container(governance, "Governance Program", "Anchor", "Proof-of-Authority voting, policy enforcement, system parameters")
+        Container(oracleProgram, "Oracle Program", "Anchor", "Price feeds, meter data validation, REC authority validation")
+    }
+    
+    ' Databases
+    Container(postgres, "PostgreSQL", "Database", "User accounts, meter assignments, trading orders, history")
+    Container(timescaledb, "TimescaleDB", "Time-Series DB", "High-frequency meter readings, price data, trading logs")
+    Container(redis, "Redis Cache", "Cache Layer", "Session storage, real-time data, message queue")
+}
+
+' External Systems
+System_Ext(solana, "Solana Network", "Executes blockchain transactions")
+System_Ext(amiBackend, "AMI Backend", "Provides meter readings and prosumer validation")
+System_Ext(weatherSvc, "Weather Service", "Production forecasts and climate data")
+System_Ext(pricingOracle, "Pricing Oracle", "Real-time energy pricing, grid conditions")
+System_Ext(walletService, "Wallet Provider", "Solana wallet for transaction signing")
+
+' Actor to Frontend
+Rel(consumer, frontend, "Browse/trade energy")
+Rel(prosumer, frontend, "List energy, manage account")
+Rel(gridOp, frontend, "Administer system")
+Rel(recAuth, frontend, "Validate certificates")
+
+' Frontend to Backend
+Rel(frontend, apiGateway, "REST API calls")
+Rel(frontend, walletService, "Sign transactions")
+
+' API Gateway to Databases
+Rel(apiGateway, postgres, "Read/write user & order data")
+Rel(apiGateway, timescaledb, "Log meter readings & trades")
+Rel(apiGateway, redis, "Cache sessions & real-time data")
+
+' API Gateway to Blockchain
+Rel(apiGateway, energyToken, "Verify tokens & REC operations")
+Rel(apiGateway, registry, "Verify registrations")
+Rel(apiGateway, trading, "Submit & query orders")
+Rel(apiGateway, governance, "Query policies & parameters")
+Rel(apiGateway, oracleProgram, "Validate data & prices")
+
+' Services to Blockchain
+Rel(dataService, energyToken, "Token validation")
+Rel(dataService, oracleProgram, "Price & meter validation")
+
+' Data flows
+Rel(meterSim, dataService, "Meter readings")
+Rel(amiBackend, dataService, "Real meter data")
+Rel(weatherSvc, oracleProgram, "Weather forecasts")
+Rel(pricingOracle, oracleProgram, "Price feeds")
+
+' Blockchain to Solana
+Rel(energyToken, solana, "Token transactions")
+Rel(registry, solana, "Registration transactions")
+Rel(trading, solana, "Trading transactions")
+Rel(governance, solana, "Governance transactions")
+Rel(oracleProgram, solana, "Oracle transactions")
+
+@enduml
+```
+
+Rel(energyToken, solanaNetwork, "On-chain")
+Rel(registryProgram, solanaNetwork, "On-chain")
+Rel(tradingProgram, solanaNetwork, "On-chain")
+Rel(governanceProgram, solanaNetwork, "On-chain")
+
+@enduml

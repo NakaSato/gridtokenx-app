@@ -77,10 +77,10 @@ cp .env.example .env
 # Edit .env with your configuration
 
 # Initialize database schema
-psql -f schema/enhanced_timescaledb_schema.sql
+psql -f schema/timescaledb_schema.sql
 
 # Run the enhanced simulator
-python enhanced_simulator.py
+python simulator.py
 ```
 
 ## Configuration
@@ -142,7 +142,7 @@ ls data/analytics/
 ### Docker Deployment
 ```bash
 # Build image
-docker build -t enhanced-meter-simulator .
+docker build -t meter-simulator .
 
 # Run container
 docker run -d \
@@ -150,7 +150,7 @@ docker run -d \
   -e NUM_METERS=30 \
   -e SIMULATION_INTERVAL=15 \
   -v $(pwd)/data:/app/data \
-  enhanced-meter-simulator
+  meter-simulator
 ```
 
 ## Data Outputs

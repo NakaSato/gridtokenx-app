@@ -1,0 +1,111 @@
+```plantuml
+@startuml C4_Level_3_Components_Backend
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title GridTokenX - API Gateway Backend Components (Level 3)
+
+Container_Boundary(apiGateway, "API Gateway (Rust + Actix-Web)") {
+    
+    ' HTTP Entry Point
+    Component(httpServer, "HTTP Server", "Actix-web", "REST API endpoints on port 3001")
+    
+    ' Authentication & Authorization Layer
+    Container_Boundary(authLayer, "Authentication & Authorization") {
+        Component(apiKeyAuth, "API Key Auth", "Middleware", "Validates API keys from users")
+        Component(walletAuth, "Wallet Signature Auth", "Verification", "Verifies Solana wallet signatures")
+        Component(roleAuthorization, "Role Authorization", "Middleware", "Checks user permissions")
+        Component(jwtTokens, "JWT Tokens", "Session Management", "Issues/validates tokens")
+    }
+    
+    ' Business Logic Services
+    Container_Boundary(businessLogic, "Business Logic Layer") {
+        Component(userService, "User Service", "Logic", "Registration, profiles, KYC")
+        Component(meterService, "Meter Service", "Logic", "Meter assignment, readings")
+        Component(tradingService, "Trading Service", "Logic", "Order creation, matching, settlement")
+        Component(governanceService, "Governance Service", "Logic", "Policy management, voting")
+        Component(oracleService, "Oracle Service", "Logic", "Data validation, price feeds")
+        Component(analyticsService, "Analytics Service", "Logic", "Trading analytics, reporting")
+    }
+    
+    ' Data Access & Repository Layer
+    Container_Boundary(dataAccess, "Data Access Layer") {
+        Component(userRepository, "User Repository", "SQL Queries", "User accounts, credentials")
+        Component(meterRepository, "Meter Repository", "SQL Queries", "Meter registrations, assignments")
+        Component(orderRepository, "Order Repository", "SQL Queries", "Trading orders, history")
+        Component(readingRepository, "Reading Repository", "Time-Series", "Meter readings (TimescaleDB)")
+        Component(auditRepository, "Audit Repository", "SQL Queries", "Activity logs")
+    }
+    
+    ' Blockchain Integration
+    Container_Boundary(blockchain, "Blockchain Integration") {
+        Component(programClients, "Program Clients", "Codama Generated", "Type-safe clients for all 5 programs")
+        Component(transactionBuilder, "Transaction Builder", "Solana SDK", "Constructs instructions")
+        Component(accountQuerier, "Account Querier", "RPC Helper", "Queries program accounts")
+        Component(rpcClient, "RPC Client", "HTTP/WebSocket", "Solana RPC endpoint")
+    }
+    
+    ' External Data Providers
+    Container_Boundary(external, "External Integrations") {
+        Component(amiConnector, "AMI Connector", "HTTP Client", "Gets meter readings from AMI")
+        Component(weatherService, "Weather API", "Data Feed", "Solar/wind production data")
+        Component(priceService, "Price Feed", "Data Feed", "Energy market pricing")
+    }
+    
+    ' Error Handling & Logging
+    Component(errorHandler, "Error Handler", "Middleware", "Logs errors, sends responses")
+    Component(logger, "Logger", "Tracing/Logging", "Request/response logs")
+}
+
+' External Databases
+Container_Boundary(databases, "Databases") {
+    Component(postgresDb, "PostgreSQL", "Relational", "Users, meters, config, audit logs")
+    Component(timescaleDb, "TimescaleDB", "Time-Series", "High-frequency meter readings, prices")
+}
+
+' Caching Layer
+Container_Boundary(cache, "Caching & Messaging") {
+    Component(redisCache, "Redis Cache", "In-Memory Store", "Sessions, real-time data, message queue")
+}
+
+' Relationships - Request Flow
+Rel(httpServer, authLayer, "Route through")
+Rel(authLayer, errorHandler, "Error handling")
+Rel(authLayer, businessLogic, "Routes to")
+
+' Business Logic to Data Access
+Rel(userService, userRepository, "Uses")
+Rel(meterService, meterRepository, "Uses")
+Rel(tradingService, orderRepository, "Uses")
+Rel(oracleService, readingRepository, "Uses")
+Rel(analyticsService, readingRepository, "Analyzes")
+
+' Business Logic to Blockchain
+Rel(userService, programClients, "Verifies registrations")
+Rel(meterService, programClients, "Queries meters")
+Rel(tradingService, programClients, "Submits trades")
+Rel(tradingService, transactionBuilder, "Builds txs")
+Rel(transactionBuilder, rpcClient, "Sends to blockchain")
+
+' Business Logic to External
+Rel(meterService, amiConnector, "Fetches readings")
+Rel(oracleService, weatherService, "Gets forecasts")
+Rel(oracleService, priceService, "Gets prices")
+
+' Data Layer to Databases
+Rel(userRepository, postgresDb, "SELECT/INSERT/UPDATE")
+Rel(meterRepository, postgresDb, "SELECT/INSERT/UPDATE")
+Rel(readingRepository, timescaleDb, "INSERT (continuous)")
+Rel(orderRepository, timescaleDb, "SELECT/INSERT")
+Rel(auditRepository, postgresDb, "INSERT (logs)")
+
+' Caching
+Rel(userService, redisCache, "Cache user sessions")
+Rel(oracleService, redisCache, "Cache pricing data")
+Rel(analyticsService, redisCache, "Publish events")
+
+' Logging
+Rel(httpServer, logger, "Logs requests")
+Rel(errorHandler, logger, "Logs errors")
+
+@enduml
+```

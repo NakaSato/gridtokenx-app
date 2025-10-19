@@ -1,0 +1,105 @@
+@startuml GridTokenX_DFD_Level_2_Blockchain
+!define FONT_NAME Arial
+!define FONT_SIZE 9
+!theme plain
+
+skinparam {
+    DefaultFontName FONT_NAME
+    DefaultFontSize FONT_SIZE
+    Padding 6
+    Margin 6
+    BackgroundColor white
+    BorderColor #333333
+    ArrowColor #333333
+}
+
+' Title
+title DFD Level 2 - Blockchain Interaction Decomposition (Process 5.0)
+
+' External Entities
+oval "Trading Engine" as E1
+oval "Smart Meter\nSystem" as E2
+oval "Authority\nValidator" as E3
+oval "Users\nWallets" as E4
+
+' Sub-processes of 5.0 Blockchain Interaction
+rectangle "5.1\nInstruction\nBuilding" as P51 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "5.2\nSigner\nManagement" as P52 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "5.3\nTransaction\nSigning" as P53 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "5.4\nTransaction\nSubmission" as P54 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "5.5\nBlock\nProduction" as P55 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "5.6\nState\nUpdate" as P56 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+' Data Stores
+database "Program\nAccounts" as D51
+database "Transaction\nLog" as D52
+database "Blockchain\nState" as D53
+database "Program\nIDLs" as D54
+
+' Data Flows - Instruction Building
+E1 --> P51 : Trading\nInstruction
+E2 --> P51 : Meter Data\nInstruction
+D54 --> P51 : IDL\nSpecification
+P51 --> D51 : Prepare\nAccounts
+P51 --> D54 : Serialize\nInstruction
+
+' Signer Management
+E4 --> P52 : Wallet\nInfo
+P52 --> P53 : Signer\nReady
+
+' Transaction Signing
+P51 --> P53 : Unsigned\nTransaction
+P52 --> P53 : Signer\nData
+E4 --> P53 : Signature\nRequest
+P53 --> D52 : Log Signing\nEvent
+P53 --> P54 : Signed\nTransaction
+
+' Transaction Submission
+P54 --> E3 : Submit\nTransaction
+E3 --> P55 : Validate\nTransaction
+P55 --> P54 : Block\nInclusion
+
+' Block Production
+P55 --> D53 : Update\nState
+D53 --> P56 : Current\nState
+P56 --> D51 : Update\nAccounts
+P56 --> D53 : Finalize\nState
+
+' Feedback
+P56 --> P54 : Confirmation
+P54 --> E1 : Transaction\nResult
+P54 --> E2 : Token Mint\nConfirm
+D52 --> E1 : Transaction\nHistory
+
+' State Queries
+D53 --> E1 : Query\nAccount State
+D51 --> E1 : Account\nBalances
+
+' Registry Interactions
+D54 --> P51 : Program IDs
+D51 --> P56 : Account\nUpdates
+
+@enduml

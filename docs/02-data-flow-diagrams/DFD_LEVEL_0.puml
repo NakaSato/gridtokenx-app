@@ -1,0 +1,61 @@
+@startuml GridTokenX_DFD_Level_0
+!define FONT_NAME Arial
+!define FONT_SIZE 10
+!theme plain
+
+skinparam {
+    DefaultFontName FONT_NAME
+    DefaultFontSize FONT_SIZE
+    Padding 8
+    Margin 8
+    BackgroundColor white
+    BorderColor #333333
+    ArrowColor #333333
+}
+
+' Process 0 - Context System
+rectangle "0\nP2P Energy Trading\nSystem (GridTokenX)" as P0 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+' External Entities (Terminators)
+oval "Campus Users" as E1
+oval "Grid Operator" as E2
+oval "Engineering\nAuthority" as E3
+oval "External\nAPIs" as E4
+oval "Monitoring\nServices" as E5
+
+' Data Stores
+database "Energy Data\nStore" as D1
+database "User & Config\nStore" as D2
+database "Smart Meter\nData" as D3
+
+' Data Flows
+E1 --> P0 : 1. User Registration\nLogin Credentials
+P0 --> E1 : 2. Trade Dashboard\nEnergy Market Data
+E1 --> P0 : 3. Create/Place Orders\nBuy/Sell Energy
+P0 --> E1 : 4. Order Status\nTransaction Results
+
+E2 --> P0 : 5. Configure Meters\nAssignments
+P0 --> E2 : 6. Meter Status\nData Collection
+
+E3 --> P0 : 7. System Control\nValidator Operations
+P0 --> E3 : 8. System Status\nMetrics
+
+E4 --> P0 : 9. Weather/Price Data\nGrid Status
+P0 --> E4 : 10. Data Requests\nQueries
+
+P0 --> E5 : 11. System Metrics\nHealth Status
+E5 --> P0 : 12. Monitoring Rules\nAlerts
+
+P0 --> D1 : 13. Store Energy Data\nReadings, Transactions
+D1 --> P0 : 14. Query Energy\nHistorical Data
+
+P0 --> D2 : 15. Store User Data\nConfiguration
+D2 --> P0 : 16. Query Users\nAccounts
+
+E2 --> D3 : 17. Update Meter\nAssignments
+D3 --> P0 : 18. Smart Meter\nData
+
+@enduml

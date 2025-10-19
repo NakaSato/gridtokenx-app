@@ -1,0 +1,64 @@
+@startuml GridTokenX_Context_Diagram
+!define FONT_NAME Arial
+!define FONT_SIZE 11
+!theme plain
+
+skinparam {
+    DefaultFontName FONT_NAME
+    DefaultFontSize FONT_SIZE
+    Padding 10
+    Margin 10
+    BackgroundColor white
+    BorderColor #333333
+    ArrowColor #333333
+    ParticipantBorderColor #333333
+    ActorBackgroundColor #E1F5FE
+    ActorBorderColor #0277BD
+    RectangleBackgroundColor #BBDEFB
+    RectangleBorderColor #0277BD
+    ComponentBackgroundColor #BBDEFB
+    ComponentBorderColor #0277BD
+}
+
+' Main System
+rectangle "P2P Energy Trading System\n(GridTokenX)" as SYSTEM {
+    rectangle "Solana Blockchain\nwith Smart Contracts" as BLOCKCHAIN
+    rectangle "API Gateway\n(Rust/Axum)" as API_GW
+    rectangle "React Frontend\nWeb Application" as FRONTEND
+    rectangle "Database Layer\n(PostgreSQL + TimescaleDB)" as DB
+    rectangle "Smart Meter\nSimulator" as SMM
+}
+
+' External Systems
+actor "Campus Users\n(Students, Faculty,\nStaff)" as USERS
+actor "Grid Operator" as GRID_OP
+actor "Engineering Authority\n(Validator)" as AUTHORITY
+actor "External APIs\n(Weather, Price,\nUtility Grid)" as EXT_API
+actor "Monitoring System\n(Grafana, Prometheus)" as MONITOR
+actor "Database Admin\n(Backup/Recovery)" as DBA
+
+' Relationships
+USERS --> FRONTEND : Web Access\nWallet Connect
+FRONTEND --> API_GW : REST/JSON\nTrade Requests
+API_GW --> BLOCKCHAIN : Smart Contract\nTransactions
+BLOCKCHAIN --> API_GW : Transaction\nResults
+API_GW --> DB : Query/Store\nEnergy Data
+DB --> API_GW : Energy\nReadings
+GRID_OP --> SMM : Configure\nMeters
+SMM --> API_GW : AMI Data\nStream
+AUTHORITY --> BLOCKCHAIN : Block\nProduction
+EXT_API --> API_GW : Weather/Price\nData
+API_GW --> EXT_API : Query\nRequests
+MONITOR --> SYSTEM : Collect\nMetrics
+DBA --> DB : Maintenance\nBackup
+
+note right of SYSTEM
+    Core Components:
+    • 5 Solana Programs (Anchor)
+    • API Gateway with JWT Auth
+    • Real-time Energy Trading
+    • PoA Consensus
+    • Time-series Data Storage
+end note
+
+@enduml

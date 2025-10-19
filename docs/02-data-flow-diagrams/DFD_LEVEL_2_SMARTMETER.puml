@@ -1,0 +1,104 @@
+@startuml GridTokenX_DFD_Level_2_SmartMeter
+!define FONT_NAME Arial
+!define FONT_SIZE 9
+!theme plain
+
+skinparam {
+    DefaultFontName FONT_NAME
+    DefaultFontSize FONT_SIZE
+    Padding 6
+    Margin 6
+    BackgroundColor white
+    BorderColor #333333
+    ArrowColor #333333
+}
+
+' Title
+title DFD Level 2 - Smart Meter Integration Decomposition (Process 4.0)
+
+' External Entities
+oval "Grid Operator" as E1
+oval "External APIs\n(Weather)" as E2
+oval "Oracle Program" as E3
+oval "Trading Engine" as E4
+
+' Sub-processes of 4.0 Smart Meter Integration
+rectangle "4.1\nMeter Assignment\n& Configuration" as P41 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "4.2\nAMI Data\nCollection" as P42 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "4.3\nData Validation\n& Conversion" as P43 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "4.4\nEnergy Reading\nProcessing" as P44 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "4.5\nREG Token\nGeneration" as P45 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+rectangle "4.6\nREC Validation" as P46 {
+    backgroundColor #BBDEFB
+    borderColor #0277BD
+}
+
+' Data Stores
+database "Meter\nRegistry" as D41
+database "AMI\nReadings" as D42
+database "Energy\nData" as D43
+database "REC\nRecords" as D44
+
+' Data Flows - Configuration
+E1 --> P41 : Configure\nMeters
+P41 --> D41 : Store Meter\nAssignments
+D41 --> P41 : Meter\nInfo
+
+' AMI Data Collection
+P42 --> D42 : Collect\nReadings
+D41 --> P42 : Meter\nLocations
+E2 --> P42 : Weather\nData
+P42 --> D42 : Store Raw\nData
+
+' Data Validation
+D42 --> P43 : Raw AMI\nData
+P43 --> P46 : Validate\nREG Rules
+P46 --> P43 : Validation\nResult
+P43 --> D43 : Store\nCleaned Data
+
+' Energy Processing
+D43 --> P44 : Read Energy\nReadings
+E2 --> P44 : Weather\nFactors
+P44 --> P45 : Generation\nAmount
+
+' REC Token Generation
+P45 --> D44 : Generate\nREC Record
+D44 --> P45 : Token\nInfo
+P45 --> E3 : Mint\nREC Tokens
+E3 --> P45 : Token\nConfirm
+
+' Output to Trading
+P44 --> E4 : Available\nEnergy Data
+D43 --> E4 : Historical\nData
+
+' Authority Validation
+E3 --> P46 : Authority\nCheck
+P46 --> D44 : REC\nValidation
+
+' Data Store Interactions
+P41 --> P42 : Meter List
+P43 --> D41 : Update Status
+D41 --> P43 : Meter Type
+D44 --> P46 : REC Status
+
+@enduml
